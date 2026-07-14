@@ -276,12 +276,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 
 <script>
 window.__DATA__ = JSON_DATA_PLACEHOLDER;
+window.__LEVEL__ = LEVEL_KEY_PLACEHOLDER;
 </script>
 <script>
 (function(){
 "use strict";
 const DATA = window.__DATA__;
-const LS_KEY = 'l3_study_v1';
+// ключ localStorage містить рівень — прогрес різних рівнів на одному origin не перетирається
+const LS_KEY = window.__LEVEL__ + '_study_v1';
 
 const DEPTH_LABEL = {deep:'Добре знати', mid:'Знати', aware:'Поверхнево'};
 const DEPTH_ORDER = ['deep','mid','aware'];

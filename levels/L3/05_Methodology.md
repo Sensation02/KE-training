@@ -1,5 +1,6 @@
 ---
 category: Software Development Methodology
+title: Methodology
 level: L3 (Middle)
 source: InterCode Competency Matrix — Full-stack
 purpose: RAG knowledge base — навчальні матеріали
