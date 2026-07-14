@@ -8,6 +8,15 @@
 # variables → Actions; генерується локально командою `claude setup-token`,
 # Pro/Max-підписка) цей workflow запускатиметься на @claude-згадки, але
 # крок автентифікації Claude завершиться помилкою.
+#
+# Безпека (репо публічний, у воркфлоу задіяний секрет):
+# - action запінено на повний commit SHA релізу (а не плаваючий тег v1),
+#   щоб оновлення тега в чужому репозиторії не могло непомітно підмінити
+#   код, який тут виконується; оновлення версії — свідомою правкою SHA;
+# - гейт акторів у `if:` — job стартує лише коли @claude написав
+#   OWNER/MEMBER/COLLABORATOR (додатковий рубіж до вбудованої перевірки
+#   прав самим action-ом). Колега, доданий як collaborator репозиторію,
+#   отримає author_association = COLLABORATOR і пройде гейт автоматично.
 name: Claude Code
 
 on:
@@ -22,11 +31,21 @@ on:
 
 jobs:
   claude:
-    if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+    # Для кожного типу події: є згадка '@claude' І автор події має
+    # достатню асоціацію з репо (OWNER/MEMBER/COLLABORATOR).
+    if: >-
+      (github.event_name == 'issue_comment' &&
+      contains(github.event.comment.body, '@claude') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'pull_request_review_comment' &&
+      contains(github.event.comment.body, '@claude') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'pull_request_review' &&
+      contains(github.event.review.body, '@claude') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.review.author_association)) ||
+      (github.event_name == 'issues' &&
+      (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')) &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -41,6 +60,6 @@ jobs:
 
       - name: Run Claude Code
         id: claude
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@f1bd27ca5b54584506e40e17884d90bdaaa1a9b3 # v1.0.173
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
