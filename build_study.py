@@ -28,12 +28,13 @@ SECTION_RE = re.compile(r"^(\d+)_.+\.md$")
 
 # емодзі глибини → внутрішній код
 DEPTH = {"🟣": "deep", "🔵": "mid", "🟢": "aware"}
-VALID_DEPTH_EMOJI = tuple(DEPTH.keys())
 
-# будь-який пункт чеклиста виду '- [ ] ...' / '- [x] ...' — незалежно від того,
-# чи є після нього валідна мітка глибини. Використовується лише для валідації
-# (на відміну від parse_checklist, який мовчки пропускає пункти без мітки).
-CHECKLIST_BULLET_RE = re.compile(r"^- \[[ xX]\]\s*(.*)$")
+# пункт чеклиста: '- [ ] 🟣|🔵|🟢 текст'. ЄДИНИЙ регекс і для парсингу
+# (parse_checklist), і для валідації (validate_checklist_lines) — щоб вони
+# ніколи не розійшлись: рядок, схожий на пункт (починається з '- [' після
+# trim), але не зматчений САМЕ цим регексом, — це помилка перевірки,
+# а не мовчазний пропуск.
+CHECKLIST_ITEM_RE = re.compile(r"^- \[[ xX]\] (🟣|🔵|🟢)\s*(.*)$")
 
 
 def parse_frontmatter(text):
@@ -84,7 +85,7 @@ def parse_checklist(text):
             cur = {"name": h.group(1).strip(), "items": []}
             cats.append(cur)
             continue
-        it = re.match(r"^- \[[ xX]\] (🟣|🔵|🟢)\s*(.*)$", line)
+        it = CHECKLIST_ITEM_RE.match(line)
         if it and cur is not None:
             cur["items"].append(
                 {"depth": DEPTH[it.group(1)], "text": it.group(2).strip()}
@@ -92,25 +93,29 @@ def parse_checklist(text):
     return [c for c in cats if c["items"]]
 
 
-def validate_checklist_labels(text, checklist_path, level_name):
-    """Пункти чеклиста ('- [ ] ...') без валідної мітки глибини 🟣/🔵/🟢.
+def validate_checklist_lines(text, checklist_path, level_name):
+    """Рядки, схожі на пункт чеклиста, які parse_checklist НЕ розпізнає.
 
-    parse_checklist() такі рядки мовчки пропускає (вони просто не
-    потрапляють у список пунктів категорії) — без цієї перевірки поламаний
-    пункт зникає без сліду замість того, щоб зупинити збірку.
+    «Схожий на пункт» = після trim починається з '- ['. Якщо такий рядок
+    не матчиться CHECKLIST_ITEM_RE — тим САМИМ регексом, яким парсить
+    parse_checklist(), — parse_checklist мовчки його пропустить, і пункт
+    зникне з dist/ без сліду. Тому будь-яка розбіжність (немає мітки
+    🟣/🔵/🟢, зайвий пробіл/таб після ']', відступ на початку, зламаний
+    чекбокс тощо) — це помилка перевірки з файлом/рядком/текстом.
     """
     errors = []
     for lineno, line in enumerate(text.splitlines(), start=1):
-        m = CHECKLIST_BULLET_RE.match(line)
-        if not m:
+        if not line.strip().startswith("- ["):
             continue
-        rest = m.group(1)
-        if not rest.startswith(VALID_DEPTH_EMOJI):
-            snippet = rest.strip()[:60] or "(порожньо)"
-            errors.append(
-                f"[{level_name}/{checklist_path.name}:{lineno}] пункт чеклиста "
-                f"без валідної мітки глибини (🟣/🔵/🟢): {snippet!r}"
-            )
+        if CHECKLIST_ITEM_RE.match(line):
+            continue
+        snippet = line.strip()[:80]
+        errors.append(
+            f"[{level_name}/{checklist_path.name}:{lineno}] рядок схожий на "
+            f"пункт чеклиста, але не відповідає формату "
+            f"'- [ ] 🟣|🔵|🟢 текст' (парсер його мовчки пропустив би): "
+            f"{snippet!r}"
+        )
     return errors
 
 
@@ -169,8 +174,9 @@ def collect_level_data(level_dir, errors):
       2. кожне питання має номер (QN), непорожній заголовок і непорожнє
          тіло відповіді;
       3. глибина кожного питання ∈ {deep, mid, aware};
-      4. чеклист має ≥1 валідний пункт, і кожен рядок-пункт чеклиста має
-         валідну мітку глибини 🟣/🔵/🟢;
+      4. чеклист має ≥1 валідний пункт, і кожен рядок, схожий на пункт
+         чеклиста, повністю відповідає формату '- [ ] 🟣|🔵|🟢 текст'
+         (той самий регекс, що й у parse_checklist);
       5. рівень сумарно має ≥1 питання.
 
     Повертає дані рівня (для рендеру HTML), або None, якщо рівень
@@ -227,7 +233,7 @@ def collect_level_data(level_dir, errors):
     checklist_path = checklists[0]
     checklist_text = checklist_path.read_text(encoding="utf-8")
     checklist = parse_checklist(checklist_text)
-    errors.extend(validate_checklist_labels(checklist_text, checklist_path, level_name))
+    errors.extend(validate_checklist_lines(checklist_text, checklist_path, level_name))
 
     total_items = sum(len(c["items"]) for c in checklist)
     if total_items == 0:
