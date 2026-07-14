@@ -7,7 +7,7 @@ OUT := dist/index.html
 SRC := build_study.py study_template.html $(shell find levels -name '*.md')
 
 .DEFAULT_GOAL := build
-.PHONY: build open clean help
+.PHONY: build check open clean help
 
 ## build: згенерувати dist/ із матеріалів (за замовчуванням)
 build: $(OUT)
@@ -15,6 +15,10 @@ build: $(OUT)
 # перезбирати лише коли змінився будь-який зі SRC-файлів
 $(OUT): $(SRC)
 	$(PY) build_study.py
+
+## check: перевірити інваріанти матеріалів (парсинг+валідація), без запису dist/
+check:
+	$(PY) build_study.py --check
 
 ## open: згенерувати (за потреби) і відкрити кореневий індекс у браузері
 open: build

@@ -1,0 +1,19 @@
+name: check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: make check (валідація інваріантів матеріалів у levels/*)
+        run: make check
+
+      - name: make build (переконатися, що збірка dist/ теж проходить)
+        run: make build
