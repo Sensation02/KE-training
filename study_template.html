@@ -58,6 +58,23 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
   display:flex;align-items:center;justify-content:center;transition:.16s}
 .icon-btn:hover{color:var(--text);border-color:var(--accent);transform:translateY(-1px)}
 
+/* ============ Індикатор синку прогресу ============ */
+.sync-badge{flex:none;font-family:var(--mono);font-size:11px;padding:6px 11px;border-radius:9px;
+  border:1px solid var(--border);background:var(--panel);color:var(--mute);white-space:nowrap;
+  transition:.16s;user-select:none}
+.sync-badge.saved{color:var(--good);border-color:var(--good);background:var(--good-soft)}
+.sync-badge.syncing{color:var(--dim)}
+.sync-badge.offline{color:var(--mute)}
+.sync-badge.needlogin,.sync-badge.error{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
+.session-banner{display:none;position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:50;
+  align-items:center;gap:12px;padding:12px 16px;border-radius:12px;border:1px solid var(--warn);
+  background:var(--panel);color:var(--text);box-shadow:var(--shadow);font-size:13.5px;
+  max-width:calc(100vw - 32px)}
+.session-banner.visible{display:flex}
+.session-banner button{flex:none;font-family:var(--font);font-size:13px;font-weight:600;
+  padding:7px 12px;border-radius:9px;border:1px solid var(--warn);background:var(--warn-soft);
+  color:var(--warn);cursor:pointer}
+
 /* ============ Вкладки ============ */
 .tabs{display:flex;gap:6px;padding:5px;background:var(--panel);border:1px solid var(--border);
   border-radius:14px;margin-bottom:22px;box-shadow:var(--shadow)}
@@ -224,6 +241,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
       <div class="ring" id="ring"><b id="ringPct">0%</b></div>
       <div class="otext"><b id="knownN">0</b>&nbsp;/&nbsp;<span id="totalN">0</span><br>вивчено</div>
     </div>
+    <span class="sync-badge syncing" id="syncBadge" title="Стан синхронізації прогресу">…синхронізація</span>
     <button class="icon-btn" id="themeBtn" title="Світла / темна тема">◐</button>
   </div>
 
@@ -274,6 +292,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
     · <a href="#" id="resetBtn" style="color:var(--mute)">скинути прогрес</a></div>
 </div>
 
+<div class="session-banner" id="sessionBanner">
+  <span>Сесію завершено — увійдіть знову.</span>
+  <button id="sessionReloadBtn" type="button">Перезавантажити</button>
+</div>
+
 <script>
 window.__DATA__ = JSON_DATA_PLACEHOLDER;
 window.__LEVEL__ = LEVEL_KEY_PLACEHOLDER;
@@ -293,16 +316,163 @@ const CAT_COLOR = {'front-end':'#f59e0b','back-end':'#ec4899','databases':'#14b8
 /* ---------- Стан / localStorage ---------- */
 function load(){
   try{
-    return Object.assign({theme:'dark',tab:'reader',q:{},chk:{}},
+    return Object.assign({theme:'dark',tab:'reader',q:{},chk:{},updatedAt:0},
       JSON.parse(localStorage.getItem(LS_KEY)||'{}'));
-  }catch(e){ return {theme:'dark',tab:'reader',q:{},chk:{}}; }
+  }catch(e){ return {theme:'dark',tab:'reader',q:{},chk:{},updatedAt:0}; }
 }
 let state = load();
+// save() — для косметичних полів (тема/вкладка/згорнуті категорії): лише локально,
+// без мітки часу й без синку. saveProgress() — для прогресу (статуси питань/чеклист):
+// оновлює updatedAt і шле в чергу на сервер. Розділ навмисний: перемикання вкладки під
+// час init() викликає save() для стартового стану, і воно не повинне виглядати як "зміна
+// прогресу щойно зараз" — інакше зіб'ється порівняння updatedAt із сервером при синку.
 function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+function saveProgress(){
+  state.updatedAt = Date.now();
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+  queueSync();
+}
+
+/* ============================================================
+   СИНХРОНІЗАЦІЯ З СЕРВЕРОМ (Cloudflare Pages Function /api/state)
+   ============================================================ */
+const BADGE_TXT = {
+  saved:'✓ збережено', syncing:'…синхронізація',
+  offline:'офлайн', needlogin:'потрібен вхід', error:'⚠ помилка синку'
+};
+function setBadge(kind){
+  const el = document.getElementById('syncBadge');
+  if(!el) return;
+  el.className = 'sync-badge ' + kind;
+  el.textContent = BADGE_TXT[kind] || '';
+}
+function showSessionBanner(){
+  const el = document.getElementById('sessionBanner');
+  if(el) el.classList.add('visible');
+}
+(function(){
+  const btn = document.getElementById('sessionReloadBtn');
+  if(btn) btn.onclick = () => location.reload();
+})();
+function sameHost(url){
+  try{ return new URL(url, location.href).hostname === location.hostname; }
+  catch(e){ return true; }
+}
+const apiUrl = () => '/api/state?level=' + encodeURIComponent(window.__LEVEL__);
+
+// known > learning > (немає ключа = нове) — при union-злитті беремо "сильніший" статус.
+const Q_RANK = {learning:1, known:2};
+function unionQ(a, b){
+  a = a || {}; b = b || {};
+  const out = {}, keys = new Set(Object.keys(a).concat(Object.keys(b)));
+  keys.forEach(k=>{
+    const st = (Q_RANK[a[k]]||0) >= (Q_RANK[b[k]]||0) ? a[k] : b[k];
+    if(st) out[k] = st;
+  });
+  return out;
+}
+function unionChk(a, b){
+  a = a || {}; b = b || {};
+  const out = {}, keys = new Set(Object.keys(a).concat(Object.keys(b)));
+  keys.forEach(k=>{ if(a[k] || b[k]) out[k] = true; });
+  return out;
+}
+
+// До відповіді на початковий GET нічого не шлемо PUT: інакше debounce (нижче),
+// запущений ще до узгодження з сервером, міг би відправити локальний стан і
+// затерти на сервері щось новіше з іншого пристрою ще до рішення union/LWW.
+let syncArmed = false;
+let syncTimer = null;
+function queueSync(){
+  if(!syncArmed) return;
+  setBadge('syncing');
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(pushNow, 1500);
+}
+
+let pushInFlight = false, pushAgain = false;
+async function pushNow(){
+  if(pushInFlight){ pushAgain = true; return false; }
+  pushInFlight = true;
+  let res;
+  try{
+    res = await fetch(apiUrl(), {
+      method:'PUT', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(state)
+    });
+  }catch(e){
+    pushInFlight = false;
+    if(pushAgain){ pushAgain = false; return pushNow(); }
+    setBadge('offline');
+    return false;
+  }
+  pushInFlight = false;
+  if(pushAgain){ pushAgain = false; return pushNow(); }
+  if(res.redirected && !sameHost(res.url)){ setBadge('needlogin'); showSessionBanner(); return false; }
+  if(res.status===401 || res.status===403){ setBadge('needlogin'); showSessionBanner(); return false; }
+  if(res.status===503){ setBadge('offline'); return false; }
+  if(res.status>=500){ setBadge('error'); return false; }
+  if(!res.ok){ setBadge('error'); return false; }
+  setBadge('saved');
+  return true;
+}
+
+async function syncOnLoad(){
+  let res;
+  try{
+    res = await fetch(apiUrl(), { credentials:'same-origin' });
+  }catch(e){
+    setBadge('offline'); syncArmed = true; return;
+  }
+  if(res.redirected && !sameHost(res.url)){ setBadge('needlogin'); showSessionBanner(); syncArmed = true; return; }
+  if(res.status===401 || res.status===403){ setBadge('needlogin'); showSessionBanner(); syncArmed = true; return; }
+  if(res.status===503){ setBadge('offline'); syncArmed = true; return; } // KV не піднято — тихий локальний режим
+  if(res.status>=500){ setBadge('error'); syncArmed = true; return; }
+  if(!res.ok){ setBadge('error'); syncArmed = true; return; }
+
+  let remote = {};
+  try{ remote = await res.json(); }catch(e){ /* лишаємо {} */ }
+
+  if(!localStorage.getItem(LS_KEY + '_synced')){
+    // перший синк на цьому пристрої — union-злиття (рішення користувача).
+    // Беремо ЖИВИЙ state.q/chk (не знімок до init()): якщо користувач встиг
+    // щось відмітити, поки GET летів, це теж має увійти в об'єднання.
+    state.q = unionQ(state.q, remote.q);
+    state.chk = unionChk(state.chk, remote.chk);
+    state.updatedAt = Date.now();
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+    // прапорець ставимо одразу, не чекаючи успіху PUT — інакше невдалий PUT
+    // назавжди тримав би пристрій у режимі union замість LWW.
+    localStorage.setItem(LS_KEY + '_synced', '1');
+    renderReader(); renderCheck(); refreshProgress();
+    setBadge('syncing');
+    pushNow();
+  }else{
+    const remoteUpdatedAt = remote.updatedAt || 0;
+    if(remoteUpdatedAt > (state.updatedAt || 0)){
+      // сервер новіший — приймаємо серверний прогрес (тема/вкладка лишаються локальними,
+      // це косметика окремого пристрою, а не частина прогресу, що синкається)
+      state.q = remote.q || {};
+      state.chk = remote.chk || {};
+      state.updatedAt = remoteUpdatedAt;
+      localStorage.setItem(LS_KEY, JSON.stringify(state));
+      renderReader(); renderCheck(); refreshProgress();
+      setBadge('saved');
+    }else if((state.updatedAt || 0) > remoteUpdatedAt){
+      // локальний новіший — лишаємо як є, наздоганяємо сервер
+      setBadge('syncing');
+      pushNow();
+    }else{
+      setBadge('saved');
+    }
+  }
+  syncArmed = true;
+}
 
 function qkey(cat,q){ return cat.key+':'+q.id; }
 function qstatus(k){ return state.q[k] || 'new'; }
-function setStatus(k,s){ if(s==='new') delete state.q[k]; else state.q[k]=s; save(); refreshProgress(); }
+function setStatus(k,s){ if(s==='new') delete state.q[k]; else state.q[k]=s; saveProgress(); refreshProgress(); }
 const $ = s => document.querySelector(s);
 
 function knownCount(){
@@ -721,7 +891,7 @@ function renderCheck(){
     row.onclick = ()=>{
       const k = row.dataset.k;
       if(state.chk[k]) delete state.chk[k]; else state.chk[k]=true;
-      save(); renderCheck();
+      saveProgress(); renderCheck();
     };
   });
 }
@@ -769,7 +939,7 @@ function init(){
     e.preventDefault();
     if(confirm('Скинути весь прогрес (статуси питань і чеклист)?')){
       state = {theme:state.theme, tab:state.tab, q:{}, chk:{}};
-      save(); renderReader(); renderCheck(); refreshProgress(); rebuildDeck();
+      saveProgress(); renderReader(); renderCheck(); refreshProgress(); rebuildDeck();
     }
   };
   document.addEventListener('keydown', e=>{
@@ -782,6 +952,7 @@ function init(){
 
   switchTab(state.tab || 'reader');
 }
+syncOnLoad().catch(()=>{}); // непередбачена помилка синку не має зупиняти застосунок
 init();
 })();
 </script>
