@@ -1,0 +1,10 @@
+# згенеровані артефакти
+L3_Study.html
+dist/
+# службове
+__pycache__/
+.DS_Store
+.claude/settings.local.json
+.superpowers/
+node_modules/
+.wrangler/

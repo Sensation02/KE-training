@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="uk" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>L3 Full-stack · Тренажер</title>
+<style>
+/* ============ Дизайн-токени ============ */
+:root{
+  --bg:#0d0f14; --bg-soft:#12151d; --panel:#161a23; --card:#191d28;
+  --card-hi:#1e2330; --border:#262c3a; --border-soft:#1f2430;
+  --text:#e7e9ef; --dim:#9aa2b1; --mute:#666e7e;
+  --accent:#7c6cff; --accent-2:#22d3ee; --accent-soft:rgba(124,108,255,.16);
+  --good:#34d399; --good-soft:rgba(52,211,153,.15);
+  --warn:#fbbf24; --warn-soft:rgba(251,191,36,.15);
+  --deep:#c084fc; --mid:#60a5fa; --aware:#34d399;
+  --code-bg:#0e1017; --code-line:#20242f;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 30px rgba(0,0,0,.28);
+  --radius:16px;
+  --font:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:ui-monospace,'SF Mono','JetBrains Mono',Menlo,Consolas,monospace;
+}
+[data-theme="light"]{
+  --bg:#f4f5f8; --bg-soft:#ffffff; --panel:#ffffff; --card:#ffffff;
+  --card-hi:#f7f8fa; --border:#e3e6ec; --border-soft:#edeff3;
+  --text:#181b22; --dim:#5b6270; --mute:#8a919e;
+  --accent:#6d4dff; --accent-soft:rgba(109,77,255,.1);
+  --good:#0f9d58; --warn:#c07c00;
+  --deep:#8b5cf6; --mid:#2563eb; --aware:#0f9d58;
+  --shadow:0 1px 2px rgba(20,30,50,.05),0 8px 24px rgba(20,30,50,.07);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:var(--bg);color:var(--text);
+  line-height:1.55;-webkit-font-smoothing:antialiased;
+  transition:background .25s,color .25s}
+::selection{background:var(--accent-soft)}
+
+/* ============ Каркас ============ */
+.app{max-width:1000px;margin:0 auto;padding:0 18px 90px}
+
+.topbar{display:flex;align-items:center;gap:16px;padding:22px 0 18px;
+  position:sticky;top:0;z-index:20;background:linear-gradient(var(--bg) 72%,transparent);}
+.brand{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.brand .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--accent)}
+.brand h1{font-size:clamp(19px,3.4vw,25px);font-weight:700;letter-spacing:-.02em;line-height:1.1}
+.overall{display:flex;align-items:center;gap:11px;flex:none}
+.ring{--p:0;position:relative;width:46px;height:46px;border-radius:50%;flex:none;
+  background:conic-gradient(var(--accent) calc(var(--p)*1%),var(--border) 0);transition:background .5s}
+.ring::after{content:"";position:absolute;inset:5px;background:var(--bg);border-radius:50%}
+.ring b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  z-index:1;font-size:12px;font-weight:700}
+.overall .otext{font-size:12px;color:var(--dim);line-height:1.25}
+.overall .otext b{color:var(--text);font-size:13px}
+.icon-btn{flex:none;width:40px;height:40px;border-radius:11px;border:1px solid var(--border);
+  background:var(--panel);color:var(--dim);cursor:pointer;font-size:18px;
+  display:flex;align-items:center;justify-content:center;transition:.16s}
+.icon-btn:hover{color:var(--text);border-color:var(--accent);transform:translateY(-1px)}
+
+/* ============ Вкладки ============ */
+.tabs{display:flex;gap:6px;padding:5px;background:var(--panel);border:1px solid var(--border);
+  border-radius:14px;margin-bottom:22px;box-shadow:var(--shadow)}
+.tab{flex:1;padding:11px 8px;border:none;background:none;color:var(--dim);cursor:pointer;
+  border-radius:10px;font-family:var(--font);font-size:14px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;gap:8px;transition:.16s}
+.tab:hover{color:var(--text)}
+.tab.active{background:var(--accent);color:#fff;box-shadow:0 4px 14px var(--accent-soft)}
+.tab .cnt{font-family:var(--mono);font-size:11px;opacity:.85;
+  background:rgba(255,255,255,.16);padding:1px 6px;border-radius:20px}
+.tab:not(.active) .cnt{background:var(--card-hi);color:var(--mute)}
+
+.view{display:none} .view.active{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ============ Фільтри ============ */
+.filters{display:flex;flex-direction:column;gap:12px;margin-bottom:18px}
+.search{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);
+  background:var(--panel);color:var(--text);font-family:var(--font);font-size:14.5px;outline:none;transition:.16s}
+.search:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.search::placeholder{color:var(--mute)}
+.chips{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:10px;
+  border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;
+  font-size:12.5px;font-weight:500;transition:.14s;user-select:none}
+.chip:hover{transform:translateY(-1px)}
+.chip.off{opacity:.4;filter:saturate(.5)}
+.chip .dot{width:9px;height:9px;border-radius:50%;flex:none}
+.chip .n{font-family:var(--mono);font-size:10.5px;color:var(--mute)}
+.dot.deep{background:var(--deep)} .dot.mid{background:var(--mid)} .dot.aware{background:var(--aware)}
+.toggle{margin-left:auto;font-size:12.5px;color:var(--dim);display:inline-flex;align-items:center;
+  gap:7px;cursor:pointer;user-select:none}
+.toggle input{accent-color:var(--accent);width:15px;height:15px}
+
+/* ============ Читалка ============ */
+.cat{margin-bottom:14px;border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--card);box-shadow:var(--shadow)}
+.cat-head{display:flex;align-items:center;gap:13px;padding:15px 17px;cursor:pointer;user-select:none}
+.cat-bar{width:4px;align-self:stretch;border-radius:3px;flex:none}
+.cat-name{font-size:16px;font-weight:700;letter-spacing:-.01em;flex:1;min-width:0}
+.cat-meta{font-family:var(--mono);font-size:11px;color:var(--dim);flex:none;text-align:right}
+.cat-meta .mini{width:74px;height:5px;background:var(--border);border-radius:20px;overflow:hidden;margin-top:5px}
+.cat-meta .mini i{display:block;height:100%;background:var(--good);border-radius:20px;transition:width .4s}
+.chev{flex:none;color:var(--mute);transition:.22s;font-size:12px}
+.cat.closed .chev{transform:rotate(-90deg)}
+.cat.closed .items{display:none}
+.items{border-top:1px solid var(--border-soft)}
+
+.q{border-top:1px solid var(--border-soft)}
+.q:first-child{border-top:none}
+.q-head{display:flex;align-items:flex-start;gap:12px;padding:13px 17px;cursor:pointer}
+.q-head:hover{background:var(--card-hi)}
+.dbadge{flex:none;margin-top:3px;width:9px;height:9px;border-radius:50%}
+.dbadge.deep{background:var(--deep)} .dbadge.mid{background:var(--mid)} .dbadge.aware{background:var(--aware)}
+.q-title{flex:1;font-size:14.5px;min-width:0;font-weight:500}
+.q-title .id{font-family:var(--mono);font-size:11px;color:var(--mute);margin-right:7px}
+.status{flex:none;font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:8px;
+  border:1px solid var(--border);background:var(--panel);color:var(--mute);cursor:pointer;
+  white-space:nowrap;transition:.14s}
+.status:hover{border-color:var(--accent)}
+.status.learning{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
+.status.known{color:var(--good);border-color:var(--good);background:var(--good-soft)}
+.answer{display:none;padding:2px 17px 20px 38px;font-size:14.5px}
+.q.open .answer{display:block;animation:fade .2s}
+.q.open .q-head{background:var(--card-hi);position:sticky;top:var(--stick-top,86px);z-index:5}
+
+.empty{text-align:center;padding:60px 20px;color:var(--mute)}
+.empty .big{font-size:34px;margin-bottom:10px}
+
+/* ============ Флеш-картки ============ */
+.deck-wrap{display:flex;flex-direction:column;align-items:center;gap:18px}
+.deck-bar{width:100%;display:flex;align-items:center;gap:14px;justify-content:center;
+  font-family:var(--mono);font-size:12px;color:var(--dim);flex-wrap:wrap}
+.deck-bar .prog{flex:1;min-width:120px;height:6px;background:var(--border);border-radius:20px;overflow:hidden}
+.deck-bar .prog i{display:block;height:100%;background:var(--accent);border-radius:20px;transition:width .3s}
+.card{width:100%;min-height:340px;background:var(--card);border:1px solid var(--border);
+  border-radius:20px;box-shadow:var(--shadow);padding:26px 26px 22px;display:flex;flex-direction:column}
+.card-top{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.pill{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+  padding:4px 9px;border-radius:20px;border:1px solid var(--border);color:var(--dim)}
+.pill.depth{display:inline-flex;align-items:center;gap:6px}
+.card-q{font-size:20px;font-weight:700;letter-spacing:-.01em;line-height:1.3}
+.card-a{margin-top:18px;padding-top:18px;border-top:1px dashed var(--border);
+  font-size:14.5px;flex:1;overflow-y:auto;max-height:46vh}
+.reveal-hint{margin-top:auto;padding-top:22px;text-align:center;color:var(--mute);font-size:13px}
+.deck-actions{display:flex;gap:12px;width:100%;margin-top:20px}
+.btn{flex:1;padding:14px;border-radius:13px;border:1px solid var(--border);background:var(--panel);
+  color:var(--text);font-family:var(--font);font-size:14.5px;font-weight:600;cursor:pointer;transition:.14s;
+  display:flex;align-items:center;justify-content:center;gap:9px}
+.btn:hover{transform:translateY(-1px)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.repeat{color:var(--warn);border-color:var(--warn)}
+.btn.know{color:var(--good);border-color:var(--good)}
+.btn kbd{font-family:var(--mono);font-size:10px;opacity:.7;border:1px solid currentColor;
+  border-radius:5px;padding:1px 5px;line-height:1}
+.deck-controls{width:100%;display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+  justify-content:center;font-size:12.5px}
+.mini-btn,select.mini-btn{font-family:var(--mono);font-size:11px;padding:7px 11px;border-radius:9px;
+  border:1px solid var(--border);background:var(--panel);color:var(--dim);cursor:pointer;transition:.14s}
+.mini-btn:hover{color:var(--text);border-color:var(--accent)}
+
+/* ============ Чеклист ============ */
+.chk-legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:18px;font-size:12.5px;color:var(--dim)}
+.chk-legend span{display:inline-flex;align-items:center;gap:7px}
+.chk-cat{margin-bottom:14px;border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--card);overflow:hidden;box-shadow:var(--shadow)}
+.chk-item{display:flex;align-items:flex-start;gap:12px;padding:12px 17px;border-top:1px solid var(--border-soft);
+  cursor:pointer;transition:.12s}
+.chk-item:hover{background:var(--card-hi)}
+.chk-box{flex:none;width:20px;height:20px;border-radius:6px;border:1.5px solid var(--border);
+  margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:12px;
+  color:transparent;transition:.14s}
+.chk-item.done .chk-box{background:var(--good);border-color:var(--good);color:#fff}
+.chk-item.done .chk-text{color:var(--mute);text-decoration:line-through}
+.chk-text{flex:1;font-size:14px}
+.chk-text .dbadge{display:inline-block;margin:0 8px 0 0;vertical-align:middle}
+
+/* ============ Рендер Markdown ============ */
+.md>*{margin-bottom:11px} .md>*:last-child{margin-bottom:0}
+.md p{color:var(--text)}
+.md strong{font-weight:700} .md em{font-style:italic}
+.md a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-soft)}
+.md a:hover{border-bottom-color:var(--accent)}
+.md code{font-family:var(--mono);font-size:.86em;background:var(--code-bg);color:#e6b3ff;
+  padding:2px 6px;border-radius:6px;border:1px solid var(--code-line)}
+.md ul,.md ol{padding-left:22px} .md li{margin-bottom:5px}
+.md ul ul,.md ol ol,.md ul ol,.md ol ul{margin-top:5px;margin-bottom:0}
+.md blockquote{border-left:3px solid var(--accent);padding:4px 0 4px 15px;color:var(--dim);
+  background:var(--accent-soft);border-radius:0 8px 8px 0}
+.md hr{border:none;border-top:1px solid var(--border);margin:14px 0}
+.md .code{position:relative;background:var(--code-bg);border:1px solid var(--code-line);
+  border-radius:11px;overflow:hidden}
+.md .code .lang{position:absolute;top:0;right:0;font-family:var(--mono);font-size:10px;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--mute);background:var(--code-line);
+  padding:3px 9px;border-radius:0 0 0 8px}
+.md pre{margin:0;padding:14px 16px;overflow-x:auto}
+.md pre code{background:none;border:none;padding:0;color:#c9d1e3;font-size:12.6px;line-height:1.65}
+.md table{width:100%;border-collapse:collapse;font-size:13px;display:block;overflow-x:auto}
+.md th,.md td{border:1px solid var(--border);padding:8px 11px;text-align:left;vertical-align:top}
+.md th{background:var(--card-hi);font-weight:600}
+/* підсвітка синтаксису */
+.t-c{color:#5f6b7d;font-style:italic} .t-s{color:#7ee787} .t-k{color:#ff9ecb}
+
+.footer{text-align:center;margin-top:34px;font-size:11.5px;color:var(--mute);font-family:var(--mono)}
+
+@media (max-width:560px){
+  .app{padding:0 12px 70px}
+  .tab{font-size:13px;padding:10px 5px}
+  .tab .cnt{display:none}
+  .card{padding:20px 18px;min-height:300px}
+  .card-q{font-size:18px}
+  .status{padding:5px 8px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="eyebrow">InterCode · Competency Matrix</div>
+      <h1>L3 Full-stack — Тренажер</h1>
+    </div>
+    <div class="overall" title="Загальний прогрес (вивчені питання)">
+      <div class="ring" id="ring"><b id="ringPct">0%</b></div>
+      <div class="otext"><b id="knownN">0</b>&nbsp;/&nbsp;<span id="totalN">0</span><br>вивчено</div>
+    </div>
+    <button class="icon-btn" id="themeBtn" title="Світла / темна тема">◐</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="reader">📖 Читалка <span class="cnt" id="cntReader">0</span></button>
+    <button class="tab" data-tab="cards">🎴 Флеш-картки <span class="cnt" id="cntCards">0</span></button>
+    <button class="tab" data-tab="check">✅ Чеклист <span class="cnt" id="cntCheck">0</span></button>
+  </div>
+
+  <!-- ЧИТАЛКА -->
+  <section class="view active" id="view-reader">
+    <div class="filters">
+      <input class="search" id="search" type="search" placeholder="🔍 Пошук по питаннях і відповідях…" autocomplete="off">
+      <div class="chips" id="catChips"></div>
+      <div class="chips">
+        <div id="depthChips" style="display:flex;gap:7px;flex-wrap:wrap"></div>
+        <label class="toggle"><input type="checkbox" id="hideKnown"> приховати вивчені</label>
+      </div>
+    </div>
+    <div id="readerList"></div>
+  </section>
+
+  <!-- ФЛЕШ-КАРТКИ -->
+  <section class="view" id="view-cards">
+    <div class="deck-controls" id="deckControls"></div>
+    <div class="deck-wrap" style="margin-top:16px">
+      <div class="deck-bar">
+        <span id="deckPos">0 / 0</span>
+        <div class="prog"><i id="deckProg"></i></div>
+        <span id="deckKnown">✓ 0</span>
+      </div>
+      <div id="deckArea" style="width:100%"></div>
+    </div>
+  </section>
+
+  <!-- ЧЕКЛИСТ -->
+  <section class="view" id="view-check">
+    <div class="chk-legend">
+      <span><span class="dbadge deep"></span> Добре знати</span>
+      <span><span class="dbadge mid"></span> Знати</span>
+      <span><span class="dbadge aware"></span> Поверхнево</span>
+      <span style="margin-left:auto"><b id="chkDone">0</b> / <span id="chkTotal">0</span> виконано</span>
+    </div>
+    <div id="checkList"></div>
+  </section>
+
+  <div class="footer">згенеровано з навчальних .md · прогрес зберігається локально в браузері
+    · <a href="#" id="resetBtn" style="color:var(--mute)">скинути прогрес</a></div>
+</div>
+
+<script>
+window.__DATA__ = JSON_DATA_PLACEHOLDER;
+</script>
+<script>
+(function(){
+"use strict";
+const DATA = window.__DATA__;
+const LS_KEY = 'l3_study_v1';
+
+const DEPTH_LABEL = {deep:'Добре знати', mid:'Знати', aware:'Поверхнево'};
+const DEPTH_ORDER = ['deep','mid','aware'];
+const CAT_COLOR = {'front-end':'#f59e0b','back-end':'#ec4899','databases':'#14b8a6',
+  'code-delivery':'#f97316','methodology':'#8b5cf6'};
+
+/* ---------- Стан / localStorage ---------- */
+function load(){
+  try{
+    return Object.assign({theme:'dark',tab:'reader',q:{},chk:{}},
+      JSON.parse(localStorage.getItem(LS_KEY)||'{}'));
+  }catch(e){ return {theme:'dark',tab:'reader',q:{},chk:{}}; }
+}
+let state = load();
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+
+function qkey(cat,q){ return cat.key+':'+q.id; }
+function qstatus(k){ return state.q[k] || 'new'; }
+function setStatus(k,s){ if(s==='new') delete state.q[k]; else state.q[k]=s; save(); refreshProgress(); }
+const $ = s => document.querySelector(s);
+
+function knownCount(){
+  let n=0;
+  for(const c of DATA.categories) for(const q of c.questions)
+    if(state.q[qkey(c,q)]==='known') n++;
+  return n;
+}
+
+/* ============================================================
+   МІНІ Markdown -> HTML (заголовків усередині відповідей немає).
+   Плейсхолдер @@@N@@@ (не містить \w) захищає код/рядки від
+   подальшого форматування — не трапляється в реальному контенті.
+   ============================================================ */
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function highlight(code, lang){
+  let s = esc(code);
+  const store = [];
+  const stash = (cls, txt) => { store.push('<span class="t-'+cls+'">'+txt+'</span>');
+    return '@@@'+(store.length-1)+'@@@'; };
+  const isSql = /sql/i.test(lang);
+  const hashLang = /ya?ml|bash|sh|dockerfile|ini|toml|env|nginx/i.test(lang);
+  // коментарі (спершу — щоб не чіпати рядки/ключові слова всередині)
+  s = s.replace(/\/\/[^\n]*/g, m => stash('c', m));
+  if(isSql) s = s.replace(/--[^\n]*/g, m => stash('c', m));
+  if(hashLang) s = s.replace(/(^|\n)([^\n]*?)(#[^\n]*)/g, (m,a,b,c) =>
+    a + b + (/["'`]/.test(b) ? c : stash('c', c)));
+  // рядки
+  s = s.replace(/"[^"\n]*"|'[^'\n]*'|`[^`]*`/g, m => stash('s', m));
+  // ключові слова (числа не підсвічуємо навмисно — уникаємо колізій)
+  if(isSql){
+    s = s.replace(/\b(select|from|where|join|left|right|inner|outer|full|group|by|order|having|insert|into|values|update|set|delete|create|alter|drop|table|view|index|primary|key|foreign|references|constraint|on|and|or|not|null|with|as|distinct|limit|offset|case|when|then|else|end|over|partition|between|like|ilike|in|exists|union|all|desc|asc|begin|commit|rollback|returning|default|check|unique|serial|integer|boolean|timestamp|numeric)\b/gi,
+      m => '<span class="t-k">'+m+'</span>');
+  }else{
+    s = s.replace(/\b(const|let|var|function|return|if|else|for|while|do|await|async|import|from|export|class|extends|new|try|catch|finally|throw|typeof|instanceof|interface|type|enum|namespace|public|private|protected|readonly|static|abstract|implements|as|of|in|void|null|undefined|true|false|this|super|default|case|switch|break|continue|yield|get|set|declare|keyof|infer|satisfies)\b/g,
+      m => '<span class="t-k">'+m+'</span>');
+  }
+  s = s.replace(/@@@(\d+)@@@/g, (m,i) => store[i]);
+  return s;
+}
+
+function inline(str){
+  const codes = [];
+  // спершу винести inline-код, щоб не форматувати всередині
+  str = str.replace(/`([^`]+)`/g, (m,c) => { codes.push(c); return '@@@'+(codes.length-1)+'@@@'; });
+  str = esc(str);
+  str = str.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,
+    (m,t,u) => '<a href="'+u+'" target="_blank" rel="noopener">'+t+'</a>');
+  str = str.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  str = str.replace(/\*(?!\s)([^*\n]+?)(?<!\s)\*/g, '<em>$1</em>');
+  str = str.replace(/@@@(\d+)@@@/g, (m,i) => '<code>'+esc(codes[i])+'</code>');
+  return str;
+}
+
+function codeBlock(code, lang){
+  const label = lang ? '<span class="lang">'+esc(lang)+'</span>' : '';
+  return '<div class="code">'+label+'<pre><code>'+highlight(code, lang)+'</code></pre></div>';
+}
+
+function listBlock(lines){
+  const toks = [];
+  for(const l of lines){
+    const m = l.match(/^(\s*)([-*+]|\d+[.)])\s+(.*)$/);
+    if(m) toks.push({indent:Math.floor(m[1].length/2), ordered:/\d/.test(m[2]), text:m[3]});
+    else if(toks.length) toks[toks.length-1].text += ' ' + l.trim();
+  }
+  if(!toks.length) return '';
+  let idx = 0;
+  function build(level){
+    const ordered = toks[idx].ordered;
+    let out = ordered ? '<ol>' : '<ul>';
+    while(idx < toks.length && toks[idx].indent >= level){
+      if(toks[idx].indent > level){ out += build(toks[idx].indent); continue; }
+      const t = toks[idx].text; idx++;
+      let sub = '';
+      if(idx < toks.length && toks[idx].indent > level) sub = build(toks[idx].indent);
+      out += '<li>'+inline(t)+sub+'</li>';
+    }
+    return out + (ordered ? '</ol>' : '</ul>');
+  }
+  return build(toks[0].indent);
+}
+
+function tableBlock(rows){
+  const cells = r => r.replace(/^\s*\|?/,'').replace(/\|?\s*$/,'').split('|').map(c=>c.trim());
+  const head = cells(rows[0]);
+  let h = '<table><thead><tr>'+head.map(c=>'<th>'+inline(c)+'</th>').join('')+'</tr></thead><tbody>';
+  for(let i=1;i<rows.length;i++)
+    h += '<tr>'+cells(rows[i]).map(c=>'<td>'+inline(c)+'</td>').join('')+'</tr>';
+  return h+'</tbody></table>';
+}
+
+function renderMarkdown(mdText){
+  const lines = mdText.replace(/\r/g,'').split('\n');
+  let html = '', i = 0;
+  while(i < lines.length){
+    const line = lines[i];
+    if(line.trim() === ''){ i++; continue; }
+    let fm = line.match(/^```(\w+)?\s*$/);
+    if(fm){
+      const lang = fm[1] || ''; i++;
+      const buf = [];
+      while(i < lines.length && !/^```\s*$/.test(lines[i])){ buf.push(lines[i]); i++; }
+      i++; html += codeBlock(buf.join('\n'), lang); continue;
+    }
+    if(/^(---+|\*\*\*+)\s*$/.test(line)){ html += '<hr>'; i++; continue; }
+    if(line.includes('|') && i+1 < lines.length &&
+       /^\s*\|?[\s:|-]+\|?\s*$/.test(lines[i+1]) && lines[i+1].includes('-')){
+      const rows = [line]; i += 2;
+      while(i < lines.length && lines[i].includes('|') && lines[i].trim() !== ''){ rows.push(lines[i]); i++; }
+      html += tableBlock(rows); continue;
+    }
+    if(/^>\s?/.test(line)){
+      const buf = [];
+      while(i < lines.length && /^>\s?/.test(lines[i])){ buf.push(lines[i].replace(/^>\s?/,'')); i++; }
+      html += '<blockquote>'+renderMarkdown(buf.join('\n'))+'</blockquote>'; continue;
+    }
+    if(/^\s*([-*+]|\d+[.)])\s+/.test(line)){
+      const buf = [];
+      while(i < lines.length && lines[i].trim() !== '' &&
+            (/^\s*([-*+]|\d+[.)])\s+/.test(lines[i]) || /^\s{2,}\S/.test(lines[i]))){
+        buf.push(lines[i]); i++;
+      }
+      html += listBlock(buf); continue;
+    }
+    const buf = [];
+    while(i < lines.length && lines[i].trim() !== '' &&
+          !/^```/.test(lines[i]) && !/^\s*([-*+]|\d+[.)])\s+/.test(lines[i]) &&
+          !/^>/.test(lines[i]) && !/^(---+|\*\*\*+)\s*$/.test(lines[i])){
+      buf.push(lines[i]); i++;
+    }
+    html += '<p>'+inline(buf.join(' '))+'</p>';
+  }
+  return html;
+}
+const mdCache = {};
+function md(k, text){ return mdCache[k] || (mdCache[k] = renderMarkdown(text)); }
+
+/* ============================================================
+   ЗАГАЛЬНИЙ ПРОГРЕС
+   ============================================================ */
+function refreshProgress(){
+  const total = DATA.totals.questions;
+  const known = knownCount();
+  const pct = total ? Math.round(known/total*100) : 0;
+  $('#ring').style.setProperty('--p', pct);
+  $('#ringPct').textContent = pct+'%';
+  $('#knownN').textContent = known;
+  $('#totalN').textContent = total;
+  document.querySelectorAll('.cat').forEach(el=>{
+    const key = el.dataset.key;
+    const cat = DATA.categories.find(c=>c.key===key);
+    if(!cat) return;
+    const kn = cat.questions.filter(q=>qstatus(qkey(cat,q))==='known').length;
+    const bar = el.querySelector('.mini i');
+    if(bar) bar.style.width = (cat.questions.length?kn/cat.questions.length*100:0)+'%';
+    const m = el.querySelector('.cat-count');
+    if(m) m.textContent = kn+' / '+cat.questions.length;
+  });
+}
+
+/* ============================================================
+   ЧИТАЛКА
+   ============================================================ */
+let filter = {cats:new Set(DATA.categories.map(c=>c.key)), depths:new Set(DEPTH_ORDER),
+  search:'', hideKnown:false};
+
+function buildChips(){
+  const cc = $('#catChips');
+  cc.innerHTML = '';
+  DATA.categories.forEach(cat=>{
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.innerHTML = '<span class="dot" style="background:'+CAT_COLOR[cat.key]+'"></span>'+
+      cat.name+' <span class="n">'+cat.questions.length+'</span>';
+    b.onclick = () => { toggleSet(filter.cats, cat.key); b.classList.toggle('off'); renderReader(); };
+    cc.appendChild(b);
+  });
+  const dc = $('#depthChips');
+  dc.innerHTML = '';
+  DEPTH_ORDER.forEach(d=>{
+    const cnt = DATA.totals.depth[d];
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.innerHTML = '<span class="dot '+d+'"></span>'+DEPTH_LABEL[d]+' <span class="n">'+cnt+'</span>';
+    b.onclick = () => { toggleSet(filter.depths, d); b.classList.toggle('off'); renderReader(); };
+    dc.appendChild(b);
+  });
+}
+function toggleSet(set, v){ set.has(v) ? set.delete(v) : set.add(v); }
+
+function matchQ(cat, q){
+  if(!filter.cats.has(cat.key)) return false;
+  if(!filter.depths.has(q.depth)) return false;
+  if(filter.hideKnown && qstatus(qkey(cat,q))==='known') return false;
+  if(filter.search){
+    const s = filter.search.toLowerCase();
+    if(!(q.title.toLowerCase().includes(s) || q.md.toLowerCase().includes(s))) return false;
+  }
+  return true;
+}
+
+const STATUS_CYCLE = {new:'learning', learning:'known', known:'new'};
+const STATUS_TXT = {new:'○ нове', learning:'◐ вчу', known:'✓ знаю'};
+
+function renderReader(){
+  const root = $('#readerList');
+  root.innerHTML = '';
+  let shown = 0;
+  DATA.categories.forEach(cat=>{
+    const qs = cat.questions.filter(q=>matchQ(cat,q));
+    if(!qs.length) return;
+    shown += qs.length;
+    const known = cat.questions.filter(q=>qstatus(qkey(cat,q))==='known').length;
+    const el = document.createElement('div');
+    el.className = 'cat'; el.dataset.key = cat.key;
+    if(state['open_'+cat.key]===false) el.classList.add('closed');
+    el.innerHTML =
+      '<div class="cat-head">'+
+        '<span class="cat-bar" style="background:'+CAT_COLOR[cat.key]+'"></span>'+
+        '<span class="cat-name">'+cat.name+'</span>'+
+        '<span class="cat-meta"><span class="cat-count">'+known+' / '+cat.questions.length+'</span>'+
+          '<span class="mini"><i style="width:'+(cat.questions.length?known/cat.questions.length*100:0)+'%"></i></span></span>'+
+        '<span class="chev">▼</span>'+
+      '</div><div class="items"></div>';
+    const items = el.querySelector('.items');
+    qs.forEach(q=>{
+      const k = qkey(cat,q);
+      const st = qstatus(k);
+      const qEl = document.createElement('div');
+      qEl.className = 'q';
+      qEl.innerHTML =
+        '<div class="q-head">'+
+          '<span class="dbadge '+q.depth+'" title="'+DEPTH_LABEL[q.depth]+'"></span>'+
+          '<span class="q-title"><span class="id">'+q.id+'</span>'+esc(q.title)+'</span>'+
+          '<button class="status '+(st!=='new'?st:'')+'">'+STATUS_TXT[st]+'</button>'+
+        '</div>'+
+        '<div class="answer md"></div>';
+      const head = qEl.querySelector('.q-head');
+      const ans = qEl.querySelector('.answer');
+      const stBtn = qEl.querySelector('.status');
+      head.onclick = (e)=>{
+        if(e.target === stBtn) return;
+        if(!ans.innerHTML) ans.innerHTML = md(k, q.md);
+        const willClose = qEl.classList.contains('open');
+        qEl.classList.toggle('open');
+        if(willClose){
+          // закриваємо приліплений заголовок — лишаємось на цьому ж запитанні, без стрибка
+          const offset = parseInt(getComputedStyle(document.documentElement)
+            .getPropertyValue('--stick-top')) || 86;
+          const top = qEl.getBoundingClientRect().top; // вже з урахуванням згорнутого layout
+          if(top < offset) window.scrollTo({top: scrollY + top - offset});
+        }
+      };
+      stBtn.onclick = (e)=>{
+        e.stopPropagation();
+        const ns = STATUS_CYCLE[qstatus(k)];
+        setStatus(k, ns);
+        stBtn.className = 'status '+(ns!=='new'?ns:'');
+        stBtn.textContent = STATUS_TXT[ns];
+      };
+      items.appendChild(qEl);
+    });
+    el.querySelector('.cat-head').onclick = (e)=>{
+      if(e.target.closest('.status')) return;
+      el.classList.toggle('closed');
+      state['open_'+cat.key] = !el.classList.contains('closed');
+      save();
+    };
+    root.appendChild(el);
+  });
+  if(!shown){
+    root.innerHTML = '<div class="empty"><div class="big">🔍</div>Нічого не знайдено — спробуй змінити фільтри або пошук.</div>';
+  }
+}
+
+/* ============================================================
+   ФЛЕШ-КАРТКИ
+   ============================================================ */
+let deckFilter = {cat:'all', depth:'all', onlyNew:false, shuffle:false};
+let deck = [], deckIdx = 0, revealed = false;
+
+function buildDeckControls(){
+  const c = $('#deckControls');
+  c.innerHTML = '';
+  const catSel = document.createElement('select');
+  catSel.className = 'mini-btn';
+  catSel.innerHTML = '<option value="all">Усі категорії</option>'+
+    DATA.categories.map(x=>'<option value="'+x.key+'">'+x.name+'</option>').join('');
+  catSel.value = deckFilter.cat;
+  catSel.onchange = ()=>{ deckFilter.cat = catSel.value; rebuildDeck(); };
+
+  const depSel = document.createElement('select');
+  depSel.className = 'mini-btn';
+  depSel.innerHTML = '<option value="all">Усі рівні</option>'+
+    DEPTH_ORDER.map(d=>'<option value="'+d+'">'+DEPTH_LABEL[d]+'</option>').join('');
+  depSel.value = deckFilter.depth;
+  depSel.onchange = ()=>{ deckFilter.depth = depSel.value; rebuildDeck(); };
+
+  const onlyNew = document.createElement('label');
+  onlyNew.className = 'toggle'; onlyNew.style.margin='0';
+  onlyNew.innerHTML = '<input type="checkbox"'+(deckFilter.onlyNew?' checked':'')+'> лише невивчені';
+  onlyNew.querySelector('input').onchange = e=>{ deckFilter.onlyNew = e.target.checked; rebuildDeck(); };
+
+  const shuffleBtn = document.createElement('button');
+  shuffleBtn.className = 'mini-btn';
+  shuffleBtn.textContent = '🔀 перемішати';
+  shuffleBtn.onclick = ()=>{ deckFilter.shuffle = true; rebuildDeck(); };
+
+  const restartBtn = document.createElement('button');
+  restartBtn.className = 'mini-btn';
+  restartBtn.textContent = '↺ спочатку';
+  restartBtn.onclick = ()=>{ deckFilter.shuffle = false; rebuildDeck(); };
+
+  c.append(catSel, depSel, onlyNew, shuffleBtn, restartBtn);
+}
+
+function rebuildDeck(){
+  deck = [];
+  DATA.categories.forEach(cat=>{
+    if(deckFilter.cat!=='all' && cat.key!==deckFilter.cat) return;
+    cat.questions.forEach(q=>{
+      if(deckFilter.depth!=='all' && q.depth!==deckFilter.depth) return;
+      if(deckFilter.onlyNew && qstatus(qkey(cat,q))==='known') return;
+      deck.push({cat, q, key:qkey(cat,q)});
+    });
+  });
+  if(deckFilter.shuffle){
+    for(let i=deck.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=deck[i]; deck[i]=deck[j]; deck[j]=t; }
+  }
+  deckIdx = 0; revealed = false;
+  renderCard();
+}
+
+function renderCard(){
+  const area = $('#deckArea');
+  const total = deck.length;
+  const knownInDeck = deck.filter(c=>qstatus(c.key)==='known').length;
+  $('#deckKnown').textContent = '✓ '+knownInDeck;
+  if(!total){
+    area.innerHTML = '<div class="empty"><div class="big">🗂️</div>Колода порожня для цих фільтрів.</div>';
+    $('#deckPos').textContent = '0 / 0'; $('#deckProg').style.width='0%'; return;
+  }
+  if(deckIdx >= total){
+    area.innerHTML = '<div class="empty"><div class="big">🎉</div>Колоду пройдено!<br><br>'+
+      '<button class="btn primary" style="max-width:220px;margin:0 auto" id="againBtn">Пройти ще раз</button></div>';
+    $('#deckPos').textContent = total+' / '+total; $('#deckProg').style.width='100%';
+    $('#againBtn').onclick = ()=>{ deckIdx=0; revealed=false; renderCard(); };
+    return;
+  }
+  $('#deckPos').textContent = (deckIdx+1)+' / '+total;
+  $('#deckProg').style.width = (deckIdx/total*100)+'%';
+  const item = deck[deckIdx];
+  const cat = item.cat, q = item.q, key = item.key;
+  const st = qstatus(key);
+  area.innerHTML =
+    '<div class="card">'+
+      '<div class="card-top">'+
+        '<span class="pill" style="border-color:'+CAT_COLOR[cat.key]+';color:'+CAT_COLOR[cat.key]+'">'+cat.name+'</span>'+
+        '<span class="pill depth"><span class="dbadge '+q.depth+'"></span>'+DEPTH_LABEL[q.depth]+'</span>'+
+        (st==='known'?'<span class="pill" style="color:var(--good);border-color:var(--good)">✓ знаю</span>':'')+
+      '</div>'+
+      '<div class="card-q"><span style="font-family:var(--mono);font-size:.7em;color:var(--mute)">'+q.id+'&nbsp;&nbsp;</span>'+esc(q.title)+'</div>'+
+      (revealed
+        ? '<div class="card-a md">'+md(key,q.md)+'</div>'
+        : '<div class="reveal-hint">Спробуй відповісти подумки, тоді розкрий ↓</div>')+
+      (revealed
+        ? '<div class="deck-actions">'+
+            '<button class="btn repeat" id="repeatBtn">↻ Повторити <kbd>1</kbd></button>'+
+            '<button class="btn know" id="knowBtn">✓ Знаю <kbd>2</kbd></button>'+
+          '</div>'
+        : '<div class="deck-actions"><button class="btn primary" id="revealBtn">Показати відповідь <kbd>Space</kbd></button></div>')+
+    '</div>';
+
+  if(revealed){
+    $('#repeatBtn').onclick = ()=>{ setStatus(key,'learning'); const c=deck.splice(deckIdx,1)[0]; deck.push(c); revealed=false; renderCard(); };
+    $('#knowBtn').onclick = ()=>{ setStatus(key,'known'); deckIdx++; revealed=false; renderCard(); };
+  }else{
+    $('#revealBtn').onclick = ()=>{ revealed=true; renderCard(); };
+  }
+}
+
+/* ============================================================
+   ЧЕКЛИСТ
+   ============================================================ */
+function chkKey(ci, ii){ return ci+':'+ii; }
+function renderCheck(){
+  const root = $('#checkList');
+  root.innerHTML = '';
+  let done = 0, total = 0;
+  DATA.checklist.forEach((cat, ci)=>{
+    const el = document.createElement('div');
+    el.className = 'chk-cat';
+    let catDone = 0;
+    const rows = cat.items.map((it, ii)=>{
+      total++;
+      const k = chkKey(ci,ii);
+      const on = !!state.chk[k];
+      if(on){ done++; catDone++; }
+      return '<div class="chk-item'+(on?' done':'')+'" data-k="'+k+'">'+
+        '<span class="chk-box">✓</span>'+
+        '<span class="chk-text"><span class="dbadge '+it.depth+'" title="'+DEPTH_LABEL[it.depth]+'"></span>'+esc(it.text)+'</span>'+
+      '</div>';
+    }).join('');
+    el.innerHTML =
+      '<div class="cat-head" style="cursor:default">'+
+        '<span class="cat-name">'+esc(cat.name)+'</span>'+
+        '<span class="cat-meta">'+catDone+' / '+cat.items.length+'</span>'+
+      '</div>'+rows;
+    root.appendChild(el);
+  });
+  $('#chkDone').textContent = done;
+  $('#chkTotal').textContent = total;
+  root.querySelectorAll('.chk-item').forEach(row=>{
+    row.onclick = ()=>{
+      const k = row.dataset.k;
+      if(state.chk[k]) delete state.chk[k]; else state.chk[k]=true;
+      save(); renderCheck();
+    };
+  });
+}
+
+/* ============================================================
+   ВКЛАДКИ / ТЕМА / ЛІЧИЛЬНИКИ
+   ============================================================ */
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id==='view-'+name));
+  state.tab = name; save();
+  if(name==='cards' && !deck.length) rebuildDeck();
+}
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme', state.theme);
+  $('#themeBtn').textContent = state.theme==='dark' ? '☀' : '☾';
+}
+
+function init(){
+  const total = DATA.totals.questions;
+  $('#cntReader').textContent = total;
+  $('#cntCards').textContent = total;
+  $('#cntCheck').textContent = DATA.checklist.reduce((a,c)=>a+c.items.length,0);
+
+  buildChips();
+  buildDeckControls();
+  renderReader();
+  renderCheck();
+  refreshProgress();
+  applyTheme();
+
+  // висота липкого топбару → офсет для липких заголовків відкритих запитань
+  const syncStickTop = ()=>{
+    const tb = document.querySelector('.topbar');
+    if(tb) document.documentElement.style.setProperty('--stick-top', tb.offsetHeight+'px');
+  };
+  syncStickTop();
+  window.addEventListener('resize', syncStickTop);
+
+  $('#search').oninput = e=>{ filter.search = e.target.value.trim(); renderReader(); };
+  $('#hideKnown').onchange = e=>{ filter.hideKnown = e.target.checked; renderReader(); };
+  document.querySelectorAll('.tab').forEach(t=>t.onclick = ()=>switchTab(t.dataset.tab));
+  $('#themeBtn').onclick = ()=>{ state.theme = state.theme==='dark'?'light':'dark'; applyTheme(); save(); };
+  $('#resetBtn').onclick = e=>{
+    e.preventDefault();
+    if(confirm('Скинути весь прогрес (статуси питань і чеклист)?')){
+      state = {theme:state.theme, tab:state.tab, q:{}, chk:{}};
+      save(); renderReader(); renderCheck(); refreshProgress(); rebuildDeck();
+    }
+  };
+  document.addEventListener('keydown', e=>{
+    if(state.tab!=='cards') return;
+    if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA') return;
+    if(e.code==='Space'){ const b=$('#revealBtn'); if(b){ e.preventDefault(); b.click(); } }
+    else if(e.key==='1'){ const b=$('#repeatBtn'); if(b) b.click(); }
+    else if(e.key==='2'){ const b=$('#knowBtn'); if(b) b.click(); }
+  });
+
+  switchTab(state.tab || 'reader');
+}
+init();
+})();
+</script>
+</body>
+</html>
