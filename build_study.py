@@ -21,6 +21,8 @@ import re
 import pathlib
 import sys
 
+import pwa_assets
+
 ROOT = pathlib.Path(__file__).parent
 LEVELS_DIR = ROOT / "levels"
 DIST_DIR = ROOT / "dist"
@@ -264,13 +266,20 @@ def json_embed(value):
 
 
 def render_level_html(template, level_key, data):
-    """Підставляє дані рівня й сам ключ рівня (для localStorage) у шаблон."""
-    if "JSON_DATA_PLACEHOLDER" not in template:
-        raise SystemExit("У шаблоні відсутній маркер JSON_DATA_PLACEHOLDER")
-    if "LEVEL_KEY_PLACEHOLDER" not in template:
-        raise SystemExit("У шаблоні відсутній маркер LEVEL_KEY_PLACEHOLDER")
+    """Підставляє дані рівня, ключ рівня (для localStorage) і PWA-фрагменти
+    (мета-теги/маніфест/apple-touch-icon, реєстрація service worker) у шаблон."""
+    for marker in (
+        "JSON_DATA_PLACEHOLDER",
+        "LEVEL_KEY_PLACEHOLDER",
+        "PWA_HEAD_PLACEHOLDER",
+        "PWA_SW_REGISTER_PLACEHOLDER",
+    ):
+        if marker not in template:
+            raise SystemExit(f"У шаблоні відсутній маркер {marker}")
     out = template.replace("JSON_DATA_PLACEHOLDER", json_embed(data))
     out = out.replace("LEVEL_KEY_PLACEHOLDER", json_embed(level_key))
+    out = out.replace("PWA_HEAD_PLACEHOLDER", pwa_assets.HEAD_TAGS)
+    out = out.replace("PWA_SW_REGISTER_PLACEHOLDER", pwa_assets.SW_REGISTER_SCRIPT)
     return out
 
 
@@ -332,7 +341,8 @@ def render_root_index(level_summaries):
         "<!DOCTYPE html>\n"
         '<html lang="uk">\n<head>\n<meta charset="UTF-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
-        "<title>KE Training</title>\n<style>" + ROOT_INDEX_CSS + "</style>\n"
+        "<title>KE Training</title>\n" + pwa_assets.HEAD_TAGS +
+        "<style>" + ROOT_INDEX_CSS + "</style>\n"
         "</head>\n<body>\n"
         '<div class="wrap">\n'
         '  <div class="eyebrow">InterCode · Competency Matrix</div>\n'
@@ -340,7 +350,8 @@ def render_root_index(level_summaries):
         '  <div class="sub">Оберіть рівень підготовки.</div>\n'
         '  <div class="levels">\n    ' + "\n    ".join(items) + "\n  </div>\n"
         '  <div class="footer">згенеровано з навчальних .md</div>\n'
-        "</div>\n</body>\n</html>\n"
+        "</div>\n" + pwa_assets.SW_REGISTER_SCRIPT +
+        "</body>\n</html>\n"
     )
 
 
@@ -439,6 +450,30 @@ def run_pipeline(check_only):
 
     (DIST_DIR / "404.html").write_text(render_404_page(), encoding="utf-8")
     print("OK -> dist/404.html")
+
+    # ---- PWA: маніфест + іконки + service worker (Ярус A/B) ----
+    manifest_bytes = json.dumps(
+        pwa_assets.build_manifest(), ensure_ascii=False, indent=2
+    ).encode("utf-8") + b"\n"
+    (DIST_DIR / "manifest.webmanifest").write_bytes(manifest_bytes)
+    print("OK -> dist/manifest.webmanifest")
+
+    icons_dir = DIST_DIR / "icons"
+    icons_dir.mkdir(exist_ok=True)
+    for size in pwa_assets.ICON_SIZES:
+        (icons_dir / f"icon-{size}.png").write_bytes(pwa_assets.render_icon(size))
+    apple_name = f"apple-touch-icon-{pwa_assets.APPLE_TOUCH_SIZE}.png"
+    (icons_dir / apple_name).write_bytes(
+        pwa_assets.render_icon(pwa_assets.APPLE_TOUCH_SIZE)
+    )
+    print(f"OK -> dist/icons/ · {len(pwa_assets.ICON_SIZES) + 1} іконки")
+
+    # хеш рахуємо ПІСЛЯ всього іншого і ДО sw.js (sw.js не хешує сам себе)
+    cache_version = pwa_assets.compute_cache_version(DIST_DIR)
+    (DIST_DIR / "sw.js").write_text(
+        pwa_assets.render_sw_js(cache_version), encoding="utf-8"
+    )
+    print(f"OK -> dist/sw.js · версія кеша {cache_version}")
 
 
 def main():

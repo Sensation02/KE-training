@@ -4,7 +4,7 @@
 
 PY  := python3
 OUT := dist/index.html
-SRC := build_study.py study_template.html $(shell find levels -name '*.md')
+SRC := build_study.py pwa_assets.py study_template.html $(shell find levels -name '*.md')
 
 .DEFAULT_GOAL := build
 .PHONY: build check open clean help
