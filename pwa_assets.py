@@ -77,11 +77,12 @@ def encode_png(width, height, rows):
 # Монограма «KE»: прямокутні штрихи (E) + лінійна інтерполяція по рядку (K).
 # Геометрія обчислюється пропорційно до `unit` (розмір канвасу з урахуванням
 # суперсемплінгу) — тому не пікселізується на жодному з трьох розмірів іконок.
+# _metrics() — єдине джерело цієї геометрії: і растровий _row_ranges()
+# (PNG-іконки), і векторний render_icon_svg() (SVG-фавікон) рахують від тих
+# самих чисел, тому растр і вектор завжди лишаються однією й тією ж монограмою.
 # =============================================================================
-def _row_ranges(y, unit):
-    """Зафарбовані діапазони [(x0,x1), ...] по вертикалі y канвасу unit×unit.
-
-    gh=0.44*unit тримає найдальші кути монограми на відстані ~0.37*unit від
+def _metrics(unit):
+    """gh=0.44*unit тримає найдальші кути монограми на відстані ~0.37*unit від
     центру — у межах maskable safe-zone (кути мають лишатись у колі радіусом
     0.40*unit від центру, інакше ОС-маска (коло/сквіркл) обріже літери)."""
     gh = unit * 0.44    # висота гліфа
@@ -89,18 +90,30 @@ def _row_ranges(y, unit):
     ew = gh * 0.58      # ширина "E"
     kw = gh * 0.62      # ширина "K"
     gap = gh * 0.16     # відстань між літерами
-    total_w = ew + gap + kw
-    x0 = (unit - total_w) / 2
+    x0 = (unit - (ew + gap + kw)) / 2
     y0 = (unit - gh) / 2
+    kx0 = x0
+    ex0 = x0 + kw + gap
+    return {
+        "gh": gh, "sw": sw, "ew": ew, "kw": kw,
+        "x0": x0, "y0": y0, "kx0": kx0, "ex0": ex0,
+        "cx": kx0 + sw / 2, "cy": y0 + gh / 2,
+    }
+
+
+def _row_ranges(y, unit):
+    """Зафарбовані діапазони [(x0,x1), ...] по вертикалі y канвасу unit×unit."""
+    m = _metrics(unit)
+    gh, sw, ew, kw = m["gh"], m["sw"], m["ew"], m["kw"]
+    x0, y0, kx0, ex0 = m["x0"], m["y0"], m["kx0"], m["ex0"]
+    cx, cy = m["cx"], m["cy"]
     if not (y0 <= y < y0 + gh):
         return []
 
     ranges = []
 
     # ---- K (ліворуч): вертикаль + дві діагоналі від середини вертикалі до кутів ----
-    kx0 = x0
     ranges.append((kx0, kx0 + sw))
-    cx, cy = kx0 + sw / 2, y0 + gh / 2
     half = sw / 2
     if y <= cy:
         t = 0.0 if cy == y0 else (cy - y) / (cy - y0)
@@ -112,7 +125,6 @@ def _row_ranges(y, unit):
         ranges.append((xc - half, xc + half))
 
     # ---- E (праворуч): вертикаль + верхня/нижня горизонталі + коротша середня ----
-    ex0 = x0 + kw + gap
     ranges.append((ex0, ex0 + sw))
     if y < y0 + sw or y >= y0 + gh - sw:
         ranges.append((ex0, ex0 + ew))
@@ -161,6 +173,48 @@ def render_icon(size):
     return encode_png(size, size, rows)
 
 
+def render_icon_svg():
+    """Векторна (SVG) версія тієї самої монограми «KE», що й render_icon() —
+    для favicon вкладки браузера: різкий на будь-якому масштабі й розмірі
+    (на відміну від растрового favicon.ico), і той самий силует, що й
+    growable PWA-іконки, тож вкладка і встановлений застосунок виглядають
+    як один і той самий значок. Геометрія — з _metrics(), а не окремі числа,
+    тому не може розійтися з растровими icon-192/512."""
+    unit = 100
+    m = _metrics(unit)
+    gh, sw, ew, kw = m["gh"], m["sw"], m["ew"], m["kw"]
+    y0, kx0, ex0 = m["y0"], m["kx0"], m["ex0"]
+    cx, cy = m["cx"], m["cy"]
+    half = sw / 2
+    accent = "#%02x%02x%02x" % ACCENT_RGB
+    glyph = "#%02x%02x%02x" % GLYPH_RGB
+
+    def rect(x, y, w, h):
+        return f'<rect x="{x:.3f}" y="{y:.3f}" width="{w:.3f}" height="{h:.3f}" fill="{glyph}"/>'
+
+    def poly(*points):
+        pts = " ".join(f"{x:.3f},{y:.3f}" for x, y in points)
+        return f'<polygon points="{pts}" fill="{glyph}"/>'
+
+    shapes = [
+        rect(kx0, y0, sw, gh),  # K: вертикаль
+        # K: верхня діагональ — від верхнього кута до середини вертикалі
+        poly((kx0 + kw - half, y0), (kx0 + kw + half, y0), (cx + half, cy), (cx - half, cy)),
+        # K: нижня діагональ — від середини вертикалі до нижнього кута
+        poly((cx - half, cy), (cx + half, cy), (kx0 + kw + half, y0 + gh), (kx0 + kw - half, y0 + gh)),
+        rect(ex0, y0, sw, gh),               # E: вертикаль
+        rect(ex0, y0, ew, sw),               # E: верхня горизонталь
+        rect(ex0, y0 + gh - sw, ew, sw),     # E: нижня горизонталь
+        rect(ex0, y0 + gh / 2 - sw / 2, ew * 0.86, sw),  # E: коротша середня
+    ]
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {unit} {unit}">'
+        f'<rect width="{unit}" height="{unit}" fill="{accent}"/>'
+        + "".join(shapes)
+        + "</svg>"
+    )
+
+
 # =============================================================================
 # Маніфест
 # =============================================================================
@@ -176,6 +230,12 @@ def build_manifest():
         "background_color": MANIFEST_BG,
         "theme_color": MANIFEST_THEME,
         "icons": [
+            {
+                "src": "/icons/icon.svg",
+                "sizes": "any",
+                "type": "image/svg+xml",
+                "purpose": "any",
+            },
             {
                 "src": "/icons/icon-192.png",
                 "sizes": "192x192",
@@ -198,6 +258,13 @@ def build_manifest():
 # джерело правди, щоб дві сторінки не розійшлись текстом тегів.
 # =============================================================================
 HEAD_TAGS = (
+    # SVG-фавікон вкладки браузера — та сама монограма «KE», що й PWA-іконки
+    # (render_icon_svg() рахує геометрію з тих самих _metrics(), що й
+    # render_icon()), тож вкладка й встановлений застосунок більше не
+    # розходяться виглядом. PNG-фолбек — для Safari/старих браузерів, які
+    # SVG-favicon не підтримують.
+    '<link rel="icon" type="image/svg+xml" href="/icons/icon.svg">\n'
+    '<link rel="alternate icon" href="/icons/icon-192.png">\n'
     # crossorigin="use-credentials" обов'язковий: за специфікацією фетч
     # маніфеста дефолтно йде БЕЗ куків (credentials mode "omit", навіть
     # same-origin) — за Cloudflare Access такий запит упирається в 302 на
@@ -263,6 +330,7 @@ const PRECACHE_URLS = [
   '/',
   '/l3/',
   '/manifest.webmanifest',
+  '/icons/icon.svg',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/apple-touch-icon-180.png',

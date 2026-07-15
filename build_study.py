@@ -460,13 +460,14 @@ def run_pipeline(check_only):
 
     icons_dir = DIST_DIR / "icons"
     icons_dir.mkdir(exist_ok=True)
+    (icons_dir / "icon.svg").write_text(pwa_assets.render_icon_svg(), encoding="utf-8")
     for size in pwa_assets.ICON_SIZES:
         (icons_dir / f"icon-{size}.png").write_bytes(pwa_assets.render_icon(size))
     apple_name = f"apple-touch-icon-{pwa_assets.APPLE_TOUCH_SIZE}.png"
     (icons_dir / apple_name).write_bytes(
         pwa_assets.render_icon(pwa_assets.APPLE_TOUCH_SIZE)
     )
-    print(f"OK -> dist/icons/ · {len(pwa_assets.ICON_SIZES) + 1} іконки")
+    print(f"OK -> dist/icons/ · {len(pwa_assets.ICON_SIZES) + 2} іконки")
 
     # хеш рахуємо ПІСЛЯ всього іншого і ДО sw.js (sw.js не хешує сам себе)
     cache_version = pwa_assets.compute_cache_version(DIST_DIR)
