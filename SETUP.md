@@ -38,15 +38,18 @@
 
 ## 3. Cloudflare Access (~10 хв)
 
-Документація: [Self-hosted public app](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/), [One-time PIN login](https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/one-time-pin/), [Policies: Allow за email](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/common-policies/), [Preview deployments](https://developers.cloudflare.com/pages/configuration/preview-deployments/), [Branch build controls](https://developers.cloudflare.com/pages/configuration/branch-build-controls/)
+Документація: [Zero Trust onboarding](https://developers.cloudflare.com/cloudflare-one/setup/), [Self-hosted public app](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/), [One-time PIN login](https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/one-time-pin/), [Policies: Allow за email](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/common-policies/), [Preview deployments](https://developers.cloudflare.com/pages/configuration/preview-deployments/), [Branch build controls](https://developers.cloudflare.com/pages/configuration/branch-build-controls/)
 
+- [ ] Перший вхід у **Zero Trust** відкриває онбординг організації: обрати **team name** — з нього складається адреса сторінки логіна Access `<team>.cloudflareaccess.com` — **запишіть її**.
+- [ ] Обрати план **Free** (до 50 користувачів, $0). Платіжний метод онбординг просить навіть для Free — кошти не списуються, це верифікація.
 - [ ] Увімкнути One-time PIN (з 2026 не додається автоматично новим Zero Trust акаунтам): **Zero Trust** → **Integrations** → **Identity providers** → **Add new identity provider** → **One-time PIN**.
 - [ ] Створити застосунок: **Zero Trust** → **Access controls** → **Applications** → **Create new application** → **Self-hosted and private** → **Add public hostname**.
-- [ ] **Domain** — `<project>.pages.dev` з кроку 1. **Path** — лишити **порожнім** (щоб застосунок покривав увесь домен разом з `/api/*` — інакше API лишиться без захисту, а це і є весь сенс Access тут).
+- [ ] **Domain** — `<project>.pages.dev` з кроку 1. **Path** — лишити **порожнім**, НЕ вписувати `api`: порожній Path покриває весь домен, тож сторінка і `/api/*` — в одному контурі автентифікації (будь-яке значення в Path захистить лише частину сайту).
+- [ ] Рекомендовано: тут же **+ Add public hostname** → **Subdomain** — `*`, **Domain** — той самий `<project>.pages.dev`: та сама політика накриє і прев'ю-деплеї `*.<project>.pages.dev` (зокрема майбутні PR-прев'ю від `@claude` з кроку 4).
 - [ ] Політика: **Add a policy** → назва (напр. `KE Training users`) → **Action: Allow** → в **Include** → селектор **Emails** → вписати свою пошту. (Додати колегу пізніше = дописати ще один email у це саме правило.)
 - [ ] **Session Duration** — обрати найближче до 30 днів значення зі списку.
 - [ ] Зберегти застосунок.
-- [ ] Прев'ю-деплеї Pages (`*.<project>.pages.dev` для гілок/PR, зокрема від `@claude` з кроку 4) цей застосунок **не покриває** — окремий піддомен. Обрати один варіант:
+- [ ] Якщо wildcard-hostname `*` вище **не** додавали: прев'ю-деплеї Pages (`*.<project>.pages.dev` для гілок/PR, зокрема від `@claude` з кроку 4) застосунок з одним hostname **не покриває** — окремий піддомен. Тоді обрати один варіант:
   - (а) простіше: Pages-проєкт → **Settings** → **General** → **Enable access policy** — вбудований перемикач Cloudflare Pages, захищає прев'ю-посилання через Access;
   - (б) або вимкнути прев'ю зовсім: Pages-проєкт → **Settings** → **Builds & deployments** → **Preview deployments** → **None**.
 - [ ] Перевірка: відкрити `<project>.pages.dev` в інкогніто-вікні — має показати екран логіна Access (форма email), а не сайт одразу.
