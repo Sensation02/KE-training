@@ -221,7 +221,7 @@ def render_icon_svg():
 def build_manifest():
     """dict для dist/manifest.webmanifest (назва затверджена користувачем)."""
     return {
-        "name": "KE Training — тренажер компетенцій",
+        "name": "KE Training",
         "short_name": "KE Training",
         "start_url": "/",
         "scope": "/",
