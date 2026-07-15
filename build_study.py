@@ -6,7 +6,8 @@
 компетенцій, і для кожного рівня вбудовує дані як JSON у
 study_template.html. Результат — самодостатні dist/<рівень>/index.html
 (відкриваються подвійним кліком або через Cloudflare Pages) плюс
-кореневий dist/index.html зі списком рівнів.
+кореневий dist/index.html зі списком рівнів і dist/404.html для
+неіснуючих шляхів (Cloudflare Pages підхоплює його автоматично).
 
 Додавання нового рівня (L2, L4, …) — це просто нова піддиректорія
 levels/<Рівень>/ з розділами й чеклистом; код нічого міняти не треба.
@@ -343,6 +344,34 @@ def render_root_index(level_summaries):
     )
 
 
+def render_404_page():
+    """Самодостатня dist/404.html у стилі кореневого індексу.
+
+    Cloudflare Pages автоматично віддає dist/404.html як відповідь для
+    неіснуючих шляхів. Без цього файлу такі шляхи мовчки резолвляться в
+    кореневий dist/index.html (Pages-фолбек), і 404 замаскується під
+    головну сторінку замість чіткого «не знайдено».
+    """
+    return (
+        "<!DOCTYPE html>\n"
+        '<html lang="uk">\n<head>\n<meta charset="UTF-8">\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
+        "<title>404 · KE Training</title>\n<style>" + ROOT_INDEX_CSS + "</style>\n"
+        "</head>\n<body>\n"
+        '<div class="wrap">\n'
+        '  <div class="eyebrow">InterCode · Competency Matrix</div>\n'
+        "  <h1>Сторінку не знайдено</h1>\n"
+        '  <div class="sub">Такої адреси немає — можливо, її перенесли або тут ніколи нічого не було.</div>\n'
+        '  <div class="levels">\n'
+        '    <a class="level" href="/">\n'
+        '      <span class="level-name">На головну</span>\n'
+        '      <span class="level-arrow">→</span>\n'
+        "    </a>\n"
+        "  </div>\n"
+        "</div>\n</body>\n</html>\n"
+    )
+
+
 def run_pipeline(check_only):
     """Парсить і валідує всі рівні; якщо check_only — на цьому й зупиняється.
 
@@ -407,6 +436,9 @@ def run_pipeline(check_only):
         render_root_index(summaries), encoding="utf-8"
     )
     print(f"OK -> dist/index.html · {len(summaries)} рівень(-ні/-ів)")
+
+    (DIST_DIR / "404.html").write_text(render_404_page(), encoding="utf-8")
+    print("OK -> dist/404.html")
 
 
 def main():

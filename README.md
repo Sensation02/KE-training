@@ -1,0 +1,27 @@
+# KE Training
+
+Інтерактивний тренажер для підготовки до KE-асесментів. Зараз реалізовано рівень **L3 Full-stack**; структура закладена так, щоб додавати L2/L4 без переробки коду (див. `DEPLOY_PLAN.md`).
+
+## Як зібрати локально
+
+```bash
+make build   # зібрати dist/ з levels/*/ (python3 build_study.py)
+make check   # лише перевірити інваріанти матеріалів, без запису dist/ (python3 build_study.py --check)
+make open    # зібрати (за потреби) і відкрити dist/index.html у браузері
+make clean   # видалити dist/
+```
+
+Залежностей, крім `python3` (стандартна бібліотека), не потрібно.
+
+## Як влаштовано
+
+- `levels/<Рівень>/` — джерело матеріалів: розділи `NN_*.md` + один `*_Checklist.md` на рівень (зараз лише `levels/L3/`).
+- `build_study.py` — python-генератор: парсить `.md`, валідує інваріанти (номер питання, глибина 🟣/🔵/🟢, формат чеклиста) і вбудовує дані як JSON у `study_template.html`.
+- Результат — статичний `dist/`: кореневий `dist/index.html` (список рівнів) + `dist/<рівень>/index.html` (самодостатня сторінка рівня). `dist/` генерується збіркою і в git не комітиться (див. `.gitignore`).
+- `functions/api/state.js` — Cloudflare Pages Function: `/api/state` (GET/PUT прогресу) поверх Cloudflare KV.
+- Прогрес синхронізується між пристроями одного користувача через Cloudflare KV; автентифікація і ідентичність користувача — через Cloudflare Access.
+
+## Деплой і план
+
+- [`SETUP.md`](SETUP.md) — чеклист ручних кроків розгортання (Cloudflare Pages, KV, Access, GitHub App для `@claude`).
+- [`DEPLOY_PLAN.md`](DEPLOY_PLAN.md) — архітектура, кроки реалізації і статус, зафіксовані рішення.

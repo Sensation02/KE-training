@@ -51,6 +51,8 @@
 Документація: [Claude Code GitHub Actions](https://code.claude.com/docs/en/github-actions), [Authentication — setup-token](https://code.claude.com/docs/en/authentication), [Secrets у GitHub Actions](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets)
 
 > `.github/workflows/claude.yml` в репо вже є і навмисно запінений на конкретний commit SHA (див. коментар у файлі) — тому НЕ запускайте `/install-github-app` у Claude Code (може запропонувати інший/новий workflow-файл). Потрібен лише ручний варіант нижче: App + секрет.
+>
+> Приклад у документації за посиланнями вище показує секрет `ANTHROPIC_API_KEY` — у цьому репозиторії використовується саме `CLAUDE_CODE_OAUTH_TOKEN` (OAuth-токен від підписки Claude), як і описано нижче в чеклисті.
 
 - [ ] Встановити GitHub App: [github.com/apps/claude](https://github.com/apps/claude) → Install → обрати акаунт → **Only select repositories** → `KE-training` → підтвердити.
 - [ ] Локально в терміналі: `claude setup-token` (потрібна підписка Pro, Max, Team або Enterprise) → відкриється браузер для авторизації → після підтвердження токен виводиться прямо в термінал (ніде не зберігається — копіювати одразу).
