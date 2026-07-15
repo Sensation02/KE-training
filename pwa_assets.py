@@ -19,23 +19,28 @@ import zlib
 
 # ---------------------------------------------------------------------------
 # Кольори — з палітри темної теми study_template.html (:root, без [data-theme
-# ="light"]): --bg:#0d0f14, --accent:#7c6cff. Іконки: суцільне тло кольором
-# акценту (без прозорості — обов'язково для apple-touch-icon і для maskable:
-# ОС сама накладає власну маску форми поверх повністю непрозорого квадрата).
-# Букви — білі: той самий контраст, що й .btn.primary/.tab.active у шаблоні
-# (background:var(--accent); color:#fff) — це вже усталена пара в дизайні.
+# ="light"]). УВАГА: значення ЗАХАРДКОЖЕНІ, з CSS не читаються — вони мають
+# збігатися з --accent (study_template.html:14) і --bg (study_template.html:11);
+# при зміні палітри шаблону оновити вручну і тут (наступна збірка перегенерує
+# іконки/маніфест/theme-color, але лише з цих констант).
+# Іконки: суцільне тло кольором акценту (без прозорості — обов'язково для
+# apple-touch-icon і для maskable: ОС сама накладає власну маску форми поверх
+# повністю непрозорого квадрата). Букви — білі: той самий контраст, що й
+# .btn.primary/.tab.active у шаблоні (background:var(--accent); color:#fff).
 # ---------------------------------------------------------------------------
-ACCENT_RGB = (0x7C, 0x6C, 0xFF)  # --accent
+ACCENT_RGB = (0x7C, 0x6C, 0xFF)  # = --accent (#7c6cff)
 GLYPH_RGB = (0xFF, 0xFF, 0xFF)   # білий текст на акцентному тлі
 
-MANIFEST_BG = "#0d0f14"     # --bg (темна тема) — фон сплеш-скріна
-MANIFEST_THEME = "#7c6cff"  # --accent (темна тема) — колір хрому ОС/браузера
+MANIFEST_BG = "#0d0f14"     # = --bg (темна тема) — фон сплеш-скріна
+MANIFEST_THEME = "#7c6cff"  # = --accent — колір хрому ОС/браузера і theme-color
 
 SUPERSAMPLE = 4  # суперсемплінг для згладжених країв діагоналей монограми
 
 ICON_SIZES = (192, 512)     # розміри іконок маніфеста
 APPLE_TOUCH_SIZE = 180      # apple-touch-icon
 
+# Єдине джерело префікса імені кеша SW: підставляється в SW_JS_TEMPLATE
+# (плейсхолдер __CACHE_PREFIX__) через render_sw_js() — у JS-шаблоні літерала немає.
 CACHE_PREFIX = "ke-training-"
 
 
@@ -193,9 +198,13 @@ def build_manifest():
 # джерело правди, щоб дві сторінки не розійшлись текстом тегів.
 # =============================================================================
 HEAD_TAGS = (
-    '<link rel="manifest" href="/manifest.webmanifest">\n'
+    # crossorigin="use-credentials" обов'язковий: за специфікацією фетч
+    # маніфеста дефолтно йде БЕЗ куків (credentials mode "omit", навіть
+    # same-origin) — за Cloudflare Access такий запит упирається в 302 на
+    # логін, і встановлюваність на проді не працює.
+    '<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">\n'
     '<link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">\n'
-    '<meta name="theme-color" content="#7c6cff">\n'
+    f'<meta name="theme-color" content="{MANIFEST_THEME}">\n'
     '<meta name="apple-mobile-web-app-capable" content="yes">\n'
     # Chrome вважає apple-* тег застарілим і в консолі радить цей стандартний
     # (виявлено емпірично під час перевірки в реальному браузері) — лишаємо
@@ -235,18 +244,18 @@ def compute_cache_version(dist_dir):
     return h.hexdigest()[:12]
 
 
-# dist/sw.js. Плейсхолдер __CACHE_VERSION__ підставляється render_sw_js() —
-# той самий підхід, що й JSON_DATA_PLACEHOLDER/LEVEL_KEY_PLACEHOLDER у
-# build_study.py (просте .replace(), без .format() — щоб не екранувати
-# фігурні дужки JS-синтаксису).
+# dist/sw.js. Плейсхолдери __CACHE_PREFIX__/__CACHE_VERSION__ підставляються
+# render_sw_js() — той самий підхід, що й JSON_DATA_PLACEHOLDER/
+# LEVEL_KEY_PLACEHOLDER у build_study.py (просте .replace(), без .format() —
+# щоб не екранувати фігурні дужки JS-синтаксису).
 SW_JS_TEMPLATE = r"""'use strict';
 
 /* dist/sw.js — згенеровано build_study.py з pwa_assets.py. НЕ редагувати
    вручну: наступна збірка перезапише цей файл. Зміни логіки — у
    pwa_assets.SW_JS_TEMPLATE. */
 
-const CACHE_NAME = 'ke-training-__CACHE_VERSION__';
-const CACHE_PREFIX = 'ke-training-';
+const CACHE_PREFIX = '__CACHE_PREFIX__';
+const CACHE_NAME = CACHE_PREFIX + '__CACHE_VERSION__';
 
 // Мінімальний precache — решта (майбутні /l2/ тощо) кешується runtime по мірі
 // відвідування, у ту саму версійну CACHE_NAME.
@@ -296,14 +305,24 @@ function isSameOrigin(url) {
 // простроченій сесії Cloudflare Access у кеш потрапила б сторінка логіна
 // (Access повертає справжній HTTP-редирект на інший хост — те саме
 // response.redirected, яким уже керується клієнтський синк у study_template).
-function isCacheableResponse(request, response) {
-  return !!response && response.ok && !response.redirected && isSameOrigin(request.url);
+function isCacheableResponse(url, response) {
+  return !!response && response.ok && !response.redirected && isSameOrigin(url);
 }
 
+// Precache стійкий до часткових збоїв: НЕ cache.addAll (він все-або-ніщо —
+// один редирект простроченої сесії Access завалив би весь install). Кожен URL
+// фетчиться окремо і кладеться в кеш лише якщо відповідь проходить ті самі
+// перевірки, що й runtime-кеш; що не вдалося — докешується runtime по мірі
+// відвідування.
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
+      .then((cache) => Promise.all(PRECACHE_URLS.map(async (url) => {
+        try {
+          const response = await fetch(url, { credentials: 'same-origin' });
+          if (isCacheableResponse(url, response)) await cache.put(url, response);
+        } catch (e) { /* офлайн/збій мережі — пропускаємо цей URL */ }
+      })))
       .then(() => self.skipWaiting())
   );
 });
@@ -323,7 +342,7 @@ self.addEventListener('activate', (event) => {
 async function networkFirst(request, isNavigation) {
   try {
     const response = await fetch(request);
-    if (isCacheableResponse(request, response)) {
+    if (isCacheableResponse(request.url, response)) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, response.clone());
     }
@@ -359,4 +378,6 @@ self.addEventListener('fetch', (event) => {
 
 
 def render_sw_js(version):
-    return SW_JS_TEMPLATE.replace("__CACHE_VERSION__", version)
+    return SW_JS_TEMPLATE.replace("__CACHE_PREFIX__", CACHE_PREFIX).replace(
+        "__CACHE_VERSION__", version
+    )

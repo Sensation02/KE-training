@@ -38,7 +38,7 @@
 
 ## 3. Cloudflare Access (~10 хв)
 
-Документація: [Zero Trust onboarding](https://developers.cloudflare.com/cloudflare-one/setup/), [Self-hosted public app](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/), [One-time PIN login](https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/one-time-pin/), [Policies: Allow за email](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/common-policies/), [Preview deployments](https://developers.cloudflare.com/pages/configuration/preview-deployments/), [Branch build controls](https://developers.cloudflare.com/pages/configuration/branch-build-controls/)
+Документація: [Zero Trust onboarding](https://developers.cloudflare.com/cloudflare-one/setup/), [Self-hosted public app](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/), [One-time PIN login](https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/one-time-pin/), [Policies: Allow за email](https://developers.cloudflare.com/cloudflare-one/access-controls/policies/common-policies/), [Application paths (wildcards, пріоритет специфічнішого шляху)](https://developers.cloudflare.com/cloudflare-one/policies/access/app-paths/), [Preview deployments](https://developers.cloudflare.com/pages/configuration/preview-deployments/), [Branch build controls](https://developers.cloudflare.com/pages/configuration/branch-build-controls/)
 
 - [ ] Перший вхід у **Zero Trust** відкриває онбординг організації: обрати **team name** — з нього складається адреса сторінки логіна Access `<team>.cloudflareaccess.com` — **запишіть її**.
 - [ ] Обрати план **Free** (до 50 користувачів, $0). Платіжний метод онбординг просить навіть для Free — кошти не списуються, це верифікація.
@@ -49,6 +49,8 @@
 - [ ] Політика: **Add a policy** → назва (напр. `KE Training users`) → **Action: Allow** → в **Include** → селектор **Emails** → вписати свою пошту. (Додати колегу пізніше = дописати ще один email у це саме правило.)
 - [ ] **Session Duration** — обрати найближче до 30 днів значення зі списку.
 - [ ] Зберегти застосунок.
+- [ ] **Bypass для PWA-файлів** (без цього застосунок не встановлюється на телефон: браузер тягне manifest, а iOS — іконку, окремими запитами без куків сесії; самі файли генеруються з публічного репозиторію і конфіденційності не мають). Створити **другий** застосунок: **Create new application** → **Self-hosted and private** → трьома **Add public hostname** додати записи на тому самому домені `<project>.pages.dev` з **Path** відповідно: `manifest.webmanifest`, `icons/*`, `sw.js`.
+- [ ] Політика цього другого застосунку: **Add a policy** → назва (напр. `PWA assets bypass`) → **Action: Bypass** → в **Include** → селектор **Everyone** → зберегти. За правилами Access специфічніший шлях має пріоритет, тож лише ці три шляхи виходять з-під логіна — `/`, `/l3/` і `/api/*` лишаються під Access основного застосунку.
 - [ ] Якщо wildcard-hostname `*` вище **не** додавали: прев'ю-деплеї Pages (`*.<project>.pages.dev` для гілок/PR, зокрема від `@claude` з кроку 4) застосунок з одним hostname **не покриває** — окремий піддомен. Тоді обрати один варіант:
   - (а) простіше: Pages-проєкт → **Settings** → **General** → **Enable access policy** — вбудований перемикач Cloudflare Pages, захищає прев'ю-посилання через Access;
   - (б) або вимкнути прев'ю зовсім: Pages-проєкт → **Settings** → **Builds & deployments** → **Preview deployments** → **None**.
