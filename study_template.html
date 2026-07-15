@@ -188,6 +188,28 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .chk-item.done .chk-text{color:var(--mute);text-decoration:line-through}
 .chk-text{flex:1;font-size:14px}
 .chk-text .dbadge{display:inline-block;margin:0 8px 0 0;vertical-align:middle}
+.chk-refs{margin-top:7px;display:flex;gap:6px;flex-wrap:wrap}
+.qref{font-family:var(--mono);font-size:10.5px;padding:3px 9px;border-radius:20px;
+  border:1px solid var(--border);background:var(--panel);color:var(--mute);cursor:pointer;
+  transition:.14s;line-height:1.5}
+.qref:hover{border-color:var(--accent);color:var(--text);transform:translateY(-1px)}
+.qref.learning{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
+.qref.known{color:var(--good);border-color:var(--good);background:var(--good-soft)}
+.chk-item.done .chk-refs .qref{text-decoration:none}
+
+/* ============ Іспит ============ */
+.exam-cat{display:flex;align-items:center;gap:12px;font-size:13.5px;margin-bottom:9px}
+.exam-cat .cname{flex:none;width:150px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.exam-cat .bar{flex:1;height:6px;background:var(--border);border-radius:20px;overflow:hidden}
+.exam-cat .bar i{display:block;height:100%;border-radius:20px;transition:width .4s}
+.exam-cat .n{font-family:var(--mono);font-size:11px;color:var(--dim);flex:none;width:44px;text-align:right}
+.exam-fails{display:flex;flex-direction:column;gap:7px;margin-top:10px}
+.exam-fail{display:flex;align-items:flex-start;gap:9px;text-align:left;padding:9px 12px;border-radius:10px;
+  border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;
+  font-family:var(--font);font-size:13px;transition:.14s}
+.exam-fail:hover{border-color:var(--accent);transform:translateY(-1px)}
+.exam-fail .id{font-family:var(--mono);font-size:11px;color:var(--mute);flex:none;margin-top:1px}
+@media (max-width:560px){ .exam-cat .cname{width:104px} }
 
 /* ============ Рендер Markdown ============ */
 .md>*{margin-bottom:11px} .md>*:last-child{margin-bottom:0}
@@ -253,6 +275,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
   <div class="tabs">
     <button class="tab active" data-tab="reader">📖 Читалка <span class="cnt" id="cntReader">0</span></button>
     <button class="tab" data-tab="cards">🎴 Флеш-картки <span class="cnt" id="cntCards">0</span></button>
+    <button class="tab" data-tab="exam">🎓 Іспит</button>
     <button class="tab" data-tab="check">✅ Чеклист <span class="cnt" id="cntCheck">0</span></button>
   </div>
 
@@ -280,6 +303,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
       </div>
       <div id="deckArea" style="width:100%"></div>
     </div>
+  </section>
+
+  <!-- ІСПИТ -->
+  <section class="view" id="view-exam">
+    <div id="examArea"></div>
   </section>
 
   <!-- ЧЕКЛИСТ -->
@@ -479,6 +507,32 @@ function qkey(cat,q){ return cat.key+':'+q.id; }
 function qstatus(k){ return state.q[k] || 'new'; }
 function setStatus(k,s){ if(s==='new') delete state.q[k]; else state.q[k]=s; saveProgress(); refreshProgress(); }
 const $ = s => document.querySelector(s);
+
+// швидкий доступ до питання за ключем 'section:QN' (посилання з чеклиста, іспит)
+const Q_BY_KEY = {};
+DATA.categories.forEach(cat=>cat.questions.forEach(q=>{ Q_BY_KEY[qkey(cat,q)] = {cat,q}; }));
+
+// Перехід «покажи це питання в читалці»: скидає фільтри (щоб питання точно
+// було видиме), відкриває категорію і саме питання, скролить до нього.
+function openQuestion(key){
+  const hit = Q_BY_KEY[key];
+  if(!hit) return;
+  filter = {cats:new Set(DATA.categories.map(c=>c.key)), depths:new Set(DEPTH_ORDER),
+    search:'', hideKnown:false};
+  $('#search').value = '';
+  $('#hideKnown').checked = false;
+  buildChips();
+  state['open_'+hit.cat.key] = true; save();
+  renderReader();
+  switchTab('reader');
+  const qEl = document.querySelector('.q[data-k="'+key+'"]');
+  if(!qEl) return;
+  if(!qEl.classList.contains('open')) qEl.querySelector('.q-head').click();
+  const offset = (parseInt(getComputedStyle(document.documentElement)
+    .getPropertyValue('--stick-top')) || 86) + 8;
+  const top = qEl.getBoundingClientRect().top;
+  window.scrollTo({top: scrollY + top - offset, behavior:'smooth'});
+}
 
 function knownCount(){
   let n=0;
@@ -710,6 +764,7 @@ function renderReader(){
       const st = qstatus(k);
       const qEl = document.createElement('div');
       qEl.className = 'q';
+      qEl.dataset.k = k;
       qEl.innerHTML =
         '<div class="q-head">'+
           '<span class="dbadge '+q.depth+'" title="'+DEPTH_LABEL[q.depth]+'"></span>'+
@@ -878,9 +933,20 @@ function renderCheck(){
       const k = chkKey(ci,ii);
       const on = !!state.chk[k];
       if(on){ done++; catDone++; }
+      // чипи питань, що покривають пункт: колір = статус вивчення, клік = перехід у читалку
+      const refs = (it.qs||[]).filter(r=>Q_BY_KEY[r]);
+      const refsHtml = refs.length
+        ? '<span class="chk-refs">'+refs.map(r=>{
+            const hit = Q_BY_KEY[r];
+            const st = qstatus(r);
+            return '<button class="qref'+(st!=='new'?' '+st:'')+'" data-key="'+r+'" '+
+              'title="'+esc(hit.cat.name+' · '+hit.q.title)+'">'+
+              STATUS_TXT[st].charAt(0)+' '+hit.q.id+'</button>';
+          }).join('')+'</span>'
+        : '';
       return '<div class="chk-item'+(on?' done':'')+'" data-k="'+k+'">'+
         '<span class="chk-box">✓</span>'+
-        '<span class="chk-text"><span class="dbadge '+it.depth+'" title="'+DEPTH_LABEL[it.depth]+'"></span>'+esc(it.text)+'</span>'+
+        '<span class="chk-text"><span class="dbadge '+it.depth+'" title="'+DEPTH_LABEL[it.depth]+'"></span>'+esc(it.text)+refsHtml+'</span>'+
       '</div>';
     }).join('');
     el.innerHTML =
@@ -899,6 +965,169 @@ function renderCheck(){
       saveProgress(); renderCheck();
     };
   });
+  root.querySelectorAll('.qref').forEach(btn=>{
+    btn.onclick = e=>{ e.stopPropagation(); openQuestion(btn.dataset.key); };
+  });
+}
+
+/* ============================================================
+   ІСПИТ — симуляція асесменту: випадкова вибірка, зважена за
+   глибиною (🟣 частіше) і рівномірна по категоріях; самооцінка
+   «відповів / не відповів» і звіт по категоріях наприкінці.
+   Прогрес «вивчено» іспит сам по собі не змінює.
+   ============================================================ */
+const EXAM_WEIGHT = {deep:3, mid:2, aware:1};
+let exam = null; // {n, items:[{cat,q,key,ok}], idx, revealed}
+
+function weightedTake(arr){
+  let sum = 0;
+  for(const it of arr) sum += EXAM_WEIGHT[it.q.depth];
+  let r = Math.random()*sum;
+  for(let i=0;i<arr.length;i++){
+    r -= EXAM_WEIGHT[arr[i].q.depth];
+    if(r <= 0) return arr.splice(i,1)[0];
+  }
+  return arr.pop();
+}
+
+function buildExamItems(n){
+  const pool = {};
+  DATA.categories.forEach(cat=>{
+    pool[cat.key] = cat.questions.map(q=>({cat, q, key:qkey(cat,q), ok:null}));
+  });
+  const keys = DATA.categories.map(c=>c.key);
+  const items = [];
+  // round-robin по категоріях — рівномірний розподіл; всередині — зважений вибір
+  while(items.length < n){
+    let took = false;
+    for(const k of keys){
+      if(items.length >= n) break;
+      if(pool[k].length){ items.push(weightedTake(pool[k])); took = true; }
+    }
+    if(!took) break; // питання скінчились раніше, ніж n
+  }
+  for(let i=items.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    const t = items[i]; items[i] = items[j]; items[j] = t;
+  }
+  return items;
+}
+
+function renderExam(){
+  const area = $('#examArea');
+  if(!exam){
+    area.innerHTML =
+      '<div class="card" style="min-height:0">'+
+        '<div class="card-top"><span class="pill" style="border-color:var(--accent);color:var(--accent)">Симуляція асесменту</span></div>'+
+        '<div class="card-q" style="font-size:19px">Перевір себе у форматі, наближеному до реального KE-асесменту.</div>'+
+        '<div style="margin-top:14px;color:var(--dim);font-size:13.5px;line-height:1.6">'+
+          'Випадкова вибірка питань: рівномірно по категоріях, глибші (🟣) випадають частіше. '+
+          'Нічого вводити не треба — відповідай уголос або подумки, як на співбесіді, '+
+          'потім розкрий відповідь і чесно оціни себе. Наприкінці — звіт зі слабкими місцями. '+
+          'Пошуку й фільтрів тут немає, прогрес «вивчено» іспит не змінює.'+
+        '</div>'+
+        '<div class="deck-controls" style="justify-content:flex-start;margin-top:18px">'+
+          '<select class="mini-btn" id="examN">'+
+            [10,15,20,30].map(n=>'<option value="'+n+'"'+(n===20?' selected':'')+'>'+n+' питань</option>').join('')+
+          '</select>'+
+        '</div>'+
+        '<div class="deck-actions"><button class="btn primary" id="examStartBtn">🎓 Почати іспит</button></div>'+
+      '</div>';
+    $('#examStartBtn').onclick = ()=>{
+      const n = parseInt($('#examN').value, 10);
+      exam = {n, items: buildExamItems(n), idx: 0, revealed: false};
+      renderExam();
+    };
+    return;
+  }
+  if(exam.idx >= exam.items.length){ renderExamReport(area); return; }
+
+  const it = exam.items[exam.idx];
+  const okN = exam.items.filter(x=>x.ok===true).length;
+  const failN = exam.items.filter(x=>x.ok===false).length;
+  area.innerHTML =
+    '<div class="deck-bar" style="margin-bottom:16px">'+
+      '<span>'+(exam.idx+1)+' / '+exam.items.length+'</span>'+
+      '<div class="prog"><i style="width:'+(exam.idx/exam.items.length*100)+'%"></i></div>'+
+      '<span style="color:var(--good)">✓ '+okN+'</span><span style="color:var(--warn)">✗ '+failN+'</span>'+
+    '</div>'+
+    '<div class="card">'+
+      '<div class="card-top">'+
+        '<span class="pill" style="border-color:'+CAT_COLOR[it.cat.key]+';color:'+CAT_COLOR[it.cat.key]+'">'+it.cat.name+'</span>'+
+        '<span class="pill depth"><span class="dbadge '+it.q.depth+'"></span>'+DEPTH_LABEL[it.q.depth]+'</span>'+
+      '</div>'+
+      '<div class="card-q"><span style="font-family:var(--mono);font-size:.7em;color:var(--mute)">'+it.q.id+'&nbsp;&nbsp;</span>'+esc(it.q.title)+'</div>'+
+      (exam.revealed
+        ? '<div class="card-a md">'+md(it.key, it.q.md)+'</div>'+
+          '<div class="deck-actions">'+
+            '<button class="btn repeat" id="exFailBtn">✗ Не відповів <kbd>1</kbd></button>'+
+            '<button class="btn know" id="exOkBtn">✓ Відповів <kbd>2</kbd></button>'+
+          '</div>'
+        : '<div class="reveal-hint">Відповідай, як на асесменті, тоді звіряйся ↓</div>'+
+          '<div class="deck-actions"><button class="btn primary" id="exRevealBtn">Показати відповідь <kbd>Space</kbd></button></div>')+
+    '</div>';
+
+  if(exam.revealed){
+    const grade = ok => ()=>{ it.ok = ok; exam.idx++; exam.revealed = false; renderExam(); };
+    $('#exFailBtn').onclick = grade(false);
+    $('#exOkBtn').onclick = grade(true);
+  }else{
+    $('#exRevealBtn').onclick = ()=>{ exam.revealed = true; renderExam(); };
+  }
+}
+
+function renderExamReport(area){
+  const items = exam.items;
+  const okN = items.filter(i=>i.ok).length;
+  const failed = items.filter(i=>!i.ok);
+  const byCat = [];
+  items.forEach(it=>{
+    let row = byCat.find(r=>r.key===it.cat.key);
+    if(!row){ row = {key:it.cat.key, name:it.cat.name, ok:0, total:0}; byCat.push(row); }
+    row.total++; if(it.ok) row.ok++;
+  });
+  const pctAll = items.length ? Math.round(okN/items.length*100) : 0;
+  const catRows = byCat.map(r=>{
+    const pct = r.total ? r.ok/r.total*100 : 0;
+    const color = pct >= 70 ? 'var(--good)' : pct >= 40 ? 'var(--warn)' : '#ef4444';
+    return '<div class="exam-cat"><span class="cname" title="'+esc(r.name)+'">'+esc(r.name)+'</span>'+
+      '<div class="bar"><i style="width:'+pct+'%;background:'+color+'"></i></div>'+
+      '<span class="n">'+r.ok+' / '+r.total+'</span></div>';
+  }).join('');
+  const failedHtml = failed.length
+    ? '<div style="margin-top:18px;font-size:13.5px"><b>На повторення (клік — відкрити в читалці):</b>'+
+      '<div class="exam-fails">'+failed.map(it=>
+        '<button class="exam-fail" data-key="'+it.key+'">'+
+          '<span class="id">'+esc(it.cat.name)+' · '+it.q.id+'</span>'+
+          '<span>'+esc(it.q.title)+'</span></button>').join('')+
+      '</div></div>'
+    : '<div style="margin-top:18px;color:var(--good);font-size:14px">Жодного провалу — так тримати! 💪</div>';
+  area.innerHTML =
+    '<div class="card" style="min-height:0">'+
+      '<div class="card-top"><span class="pill" style="border-color:var(--accent);color:var(--accent)">Результат іспиту</span></div>'+
+      '<div class="card-q">'+okN+' з '+items.length+' ('+pctAll+'%)</div>'+
+      '<div style="margin-top:16px">'+catRows+'</div>'+
+      failedHtml+
+      '<div class="deck-actions" style="flex-wrap:wrap">'+
+        (failed.length ? '<button class="btn repeat" id="exMarkBtn">◐ Позначити провалені як «вчу»</button>' : '')+
+        '<button class="btn primary" id="exAgainBtn">↻ Пройти ще раз</button>'+
+        '<button class="btn" id="exSetupBtn">⚙ Налаштування</button>'+
+      '</div>'+
+    '</div>';
+  const markBtn = $('#exMarkBtn');
+  if(markBtn) markBtn.onclick = ()=>{
+    failed.forEach(it=>setStatus(it.key, 'learning'));
+    markBtn.textContent = '✓ Позначено';
+    markBtn.disabled = true;
+  };
+  $('#exAgainBtn').onclick = ()=>{
+    exam = {n:exam.n, items: buildExamItems(exam.n), idx:0, revealed:false};
+    renderExam();
+  };
+  $('#exSetupBtn').onclick = ()=>{ exam = null; renderExam(); };
+  area.querySelectorAll('.exam-fail').forEach(btn=>{
+    btn.onclick = ()=>openQuestion(btn.dataset.key);
+  });
 }
 
 /* ============================================================
@@ -909,6 +1138,8 @@ function switchTab(name){
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id==='view-'+name));
   state.tab = name; save();
   if(name==='cards' && !deck.length) rebuildDeck();
+  if(name==='exam') renderExam();
+  if(name==='check') renderCheck(); // освіжити кольори чипів питань після навчання
 }
 function applyTheme(){
   document.documentElement.setAttribute('data-theme', state.theme);
@@ -948,11 +1179,16 @@ function init(){
     }
   };
   document.addEventListener('keydown', e=>{
-    if(state.tab!=='cards') return;
     if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA') return;
-    if(e.code==='Space'){ const b=$('#revealBtn'); if(b){ e.preventDefault(); b.click(); } }
-    else if(e.key==='1'){ const b=$('#repeatBtn'); if(b) b.click(); }
-    else if(e.key==='2'){ const b=$('#knowBtn'); if(b) b.click(); }
+    if(state.tab==='cards'){
+      if(e.code==='Space'){ const b=$('#revealBtn'); if(b){ e.preventDefault(); b.click(); } }
+      else if(e.key==='1'){ const b=$('#repeatBtn'); if(b) b.click(); }
+      else if(e.key==='2'){ const b=$('#knowBtn'); if(b) b.click(); }
+    }else if(state.tab==='exam'){
+      if(e.code==='Space'){ const b=$('#exRevealBtn'); if(b){ e.preventDefault(); b.click(); } }
+      else if(e.key==='1'){ const b=$('#exFailBtn'); if(b) b.click(); }
+      else if(e.key==='2'){ const b=$('#exOkBtn'); if(b) b.click(); }
+    }
   });
 
   switchTab(state.tab || 'reader');
