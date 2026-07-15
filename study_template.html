@@ -2,7 +2,7 @@
 <html lang="uk" data-theme="dark">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>L3 Full-stack · Тренажер</title>
 PWA_HEAD_PLACEHOLDER
 <style>
@@ -38,10 +38,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 ::selection{background:var(--accent-soft)}
 
 /* ============ Каркас ============ */
-.app{max-width:1000px;margin:0 auto;padding:0 18px 90px}
+.app{max-width:1000px;margin:0 auto;padding:0 18px calc(90px + env(safe-area-inset-bottom))}
 
-.topbar{display:flex;align-items:center;gap:16px;padding:22px 0 18px;
-  position:sticky;top:0;z-index:20;background:linear-gradient(var(--bg) 72%,transparent);}
+.topbar{display:flex;align-items:center;flex-wrap:wrap;gap:12px 16px;padding:22px 0 18px;
+  position:sticky;top:0;z-index:20;background:var(--bg)}
 .brand{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
 .brand .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;
   text-transform:uppercase;color:var(--accent)}
@@ -67,7 +67,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .sync-badge.syncing{color:var(--dim)}
 .sync-badge.offline{color:var(--mute)}
 .sync-badge.needlogin,.sync-badge.error{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
-.session-banner{display:none;position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:50;
+.session-banner{display:none;position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));
+  transform:translateX(-50%);z-index:50;flex-wrap:wrap;
   align-items:center;gap:12px;padding:12px 16px;border-radius:12px;border:1px solid var(--warn);
   background:var(--panel);color:var(--text);box-shadow:var(--shadow);font-size:13.5px;
   max-width:calc(100vw - 32px)}
@@ -222,12 +223,21 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .footer{text-align:center;margin-top:34px;font-size:11.5px;color:var(--mute);font-family:var(--mono)}
 
 @media (max-width:560px){
-  .app{padding:0 12px 70px}
+  .app{padding:0 12px calc(70px + env(safe-area-inset-bottom))}
+  .topbar{padding:16px 0 14px;gap:10px}
+  .brand{flex:1 1 100%;order:1}
+  .overall{order:2}
+  .sync-badge{order:3}
+  .icon-btn{order:4;margin-left:auto}
   .tab{font-size:13px;padding:10px 5px}
   .tab .cnt{display:none}
   .card{padding:20px 18px;min-height:300px}
   .card-q{font-size:18px}
   .status{padding:5px 8px}
+  .cat-head{padding:13px 14px}
+  .cat-meta .mini{width:56px}
+  .q-head{padding:12px 14px}
+  .answer{padding:2px 14px 18px 34px}
 }
 </style>
 </head>
