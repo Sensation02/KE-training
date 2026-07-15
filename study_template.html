@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>L3 Full-stack · Тренажер</title>
+<title>L3 Full-stack</title>
 PWA_HEAD_PLACEHOLDER
 <style>
 /* ============ Дизайн-токени ============ */
@@ -58,15 +58,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
   background:var(--panel);color:var(--dim);cursor:pointer;font-size:18px;
   display:flex;align-items:center;justify-content:center;transition:.16s}
 .icon-btn:hover{color:var(--text);border-color:var(--accent);transform:translateY(-1px)}
-
-/* ============ Індикатор синку прогресу ============ */
-.sync-badge{flex:none;font-family:var(--mono);font-size:11px;padding:6px 11px;border-radius:9px;
-  border:1px solid var(--border);background:var(--panel);color:var(--mute);white-space:nowrap;
-  transition:.16s;user-select:none}
-.sync-badge.saved{color:var(--good);border-color:var(--good);background:var(--good-soft)}
-.sync-badge.syncing{color:var(--dim)}
-.sync-badge.offline{color:var(--mute)}
-.sync-badge.needlogin,.sync-badge.error{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
+.nav-back{flex:none;width:40px;height:40px;border-radius:11px;border:1px solid var(--border);
+  background:var(--panel);color:var(--dim);cursor:pointer;font-size:20px;text-decoration:none;
+  display:flex;align-items:center;justify-content:center;transition:.16s}
+.nav-back:hover{color:var(--text);border-color:var(--accent);transform:translateY(-1px)}
 .session-banner{display:none;position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));
   transform:translateX(-50%);z-index:50;flex-wrap:wrap;
   align-items:center;gap:12px;padding:12px 16px;border-radius:12px;border:1px solid var(--warn);
@@ -227,7 +222,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
   .topbar{padding:16px 0 14px;gap:10px}
   .brand{flex:1 1 100%;order:1}
   .overall{order:2}
-  .sync-badge{order:3}
   .icon-btn{order:4;margin-left:auto}
   .tab{font-size:13px;padding:10px 5px}
   .tab .cnt{display:none}
@@ -244,15 +238,15 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 <body>
 <div class="app">
   <div class="topbar">
+    <a class="nav-back" href="/" title="До вибору рівня" aria-label="До вибору рівня">←</a>
     <div class="brand">
       <div class="eyebrow">InterCode · Competency Matrix</div>
-      <h1>L3 Full-stack — Тренажер</h1>
+      <h1>L3 Full-stack</h1>
     </div>
     <div class="overall" title="Загальний прогрес (вивчені питання)">
       <div class="ring" id="ring"><b id="ringPct">0%</b></div>
       <div class="otext"><b id="knownN">0</b>&nbsp;/&nbsp;<span id="totalN">0</span><br>вивчено</div>
     </div>
-    <span class="sync-badge syncing" id="syncBadge" title="Стан синхронізації прогресу">…синхронізація</span>
     <button class="icon-btn" id="themeBtn" title="Світла / темна тема">◐</button>
   </div>
 
@@ -299,7 +293,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
     <div id="checkList"></div>
   </section>
 
-  <div class="footer">згенеровано з навчальних .md · прогрес зберігається локально в браузері
+  <div class="footer">згенеровано з навчальних .md
     · <a href="#" id="resetBtn" style="color:var(--mute)">скинути прогрес</a></div>
 </div>
 
@@ -701,7 +695,7 @@ function renderReader(){
     const known = cat.questions.filter(q=>qstatus(qkey(cat,q))==='known').length;
     const el = document.createElement('div');
     el.className = 'cat'; el.dataset.key = cat.key;
-    if(state['open_'+cat.key]===false) el.classList.add('closed');
+    if(state['open_'+cat.key]!==true) el.classList.add('closed');
     el.innerHTML =
       '<div class="cat-head">'+
         '<span class="cat-bar" style="background:'+CAT_COLOR[cat.key]+'"></span>'+
