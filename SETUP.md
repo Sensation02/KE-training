@@ -8,6 +8,10 @@
 
 Документація: [Git integration · Cloudflare Pages](https://developers.cloudflare.com/pages/get-started/git-integration/), [GitHub integration](https://developers.cloudflare.com/pages/configuration/git-integration/github-integration/)
 
+> Дашборд Cloudflare може відкрити майстер **Worker** замість Pages. Ознаки: заголовок «Configure your Worker project», поле **Deploy command** = `npx wrangler deploy`, немає поля **Build output directory**.
+>
+> Поверніться назад, оберіть вкладку **Pages** (**Import an existing Git repository**) — там є поле **Build output directory** = `dist`. Без цього `/api/state` не запрацює: `functions/api/state.js` — це Pages Function, не Worker.
+
 - [ ] Акаунт Cloudflare — створити на cloudflare.com, якщо ще немає.
 - [ ] У дашборді: **Workers & Pages** → **Create application** → вкладка **Pages** → **Connect to Git**.
 - [ ] Авторизувати GitHub-застосунок Cloudflare (кнопка додавання акаунта, потім Install/Authorize) → доступ дати **Only select repositories** → обрати `KE-training`.
@@ -18,6 +22,7 @@
   - **Build command** — `python3 build_study.py`
   - **Build output directory** — `dist`
 - [ ] **Save and Deploy** — перший білд піде автоматично.
+- Якщо білд падає з «Error: Output directory "..." not found» / «build output directory not found» — у полі **Build output directory** стоїть не `dist` (типова помилка — вписати туди назву гілки, напр. `main`): виправити в **Settings** → **Builds & deployments** → **Build configuration**, поставити `dist`, натиснути **Retry deployment**.
 - [ ] Після завершення білда відкрити `<project>.pages.dev` — перевірити і з ноутбука, і з телефона.
 
 ## 2. KV namespace + binding `STUDY_STATE` (~5 хв)
