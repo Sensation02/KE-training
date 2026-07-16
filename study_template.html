@@ -228,7 +228,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 @media (max-width:560px){
   .app{padding:0 12px calc(70px + env(safe-area-inset-bottom))}
   .topbar{padding:16px 0 14px;gap:10px}
-  .brand{flex:1 1 100%;order:1}
+  /* бренд — перший рядок на всю ширину; під ним одним рядком: ← · прогрес · тема */
+  .brand{flex:1 1 100%;order:0}
+  .nav-back{order:1}
   .overall{order:2}
   .icon-btn{order:4;margin-left:auto}
   .tab{font-size:13px;padding:10px 5px}
