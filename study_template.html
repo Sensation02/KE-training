@@ -188,6 +188,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .chk-item.done .chk-text{color:var(--mute);text-decoration:line-through}
 .chk-text{flex:1;font-size:14px}
 .chk-text .dbadge{display:inline-block;margin:0 8px 0 0;vertical-align:middle}
+.chk-refs{margin-top:7px;display:flex;gap:6px;flex-wrap:wrap}
+.qref{font-family:var(--mono);font-size:10.5px;padding:3px 9px;border-radius:20px;
+  border:1px solid var(--border);background:var(--panel);color:var(--mute);cursor:pointer;
+  transition:.14s;line-height:1.5}
+.qref:hover{border-color:var(--accent);color:var(--text);transform:translateY(-1px)}
+.qref.learning{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
+.qref.known{color:var(--good);border-color:var(--good);background:var(--good-soft)}
+.chk-item.done .chk-refs .qref{text-decoration:none}
 
 /* ============ Рендер Markdown ============ */
 .md>*{margin-bottom:11px} .md>*:last-child{margin-bottom:0}
@@ -480,6 +488,32 @@ function qstatus(k){ return state.q[k] || 'new'; }
 function setStatus(k,s){ if(s==='new') delete state.q[k]; else state.q[k]=s; saveProgress(); refreshProgress(); }
 const $ = s => document.querySelector(s);
 
+// швидкий доступ до питання за ключем 'section:QN' (посилання з чеклиста)
+const Q_BY_KEY = {};
+DATA.categories.forEach(cat=>cat.questions.forEach(q=>{ Q_BY_KEY[qkey(cat,q)] = {cat,q}; }));
+
+// Перехід «покажи це питання в читалці»: скидає фільтри (щоб питання точно
+// було видиме), відкриває категорію і саме питання, скролить до нього.
+function openQuestion(key){
+  const hit = Q_BY_KEY[key];
+  if(!hit) return;
+  filter = {cats:new Set(DATA.categories.map(c=>c.key)), depths:new Set(DEPTH_ORDER),
+    search:'', hideKnown:false};
+  $('#search').value = '';
+  $('#hideKnown').checked = false;
+  buildChips();
+  state['open_'+hit.cat.key] = true; save();
+  renderReader();
+  switchTab('reader');
+  const qEl = document.querySelector('.q[data-k="'+key+'"]');
+  if(!qEl) return;
+  if(!qEl.classList.contains('open')) qEl.querySelector('.q-head').click();
+  const offset = (parseInt(getComputedStyle(document.documentElement)
+    .getPropertyValue('--stick-top')) || 86) + 8;
+  const top = qEl.getBoundingClientRect().top;
+  window.scrollTo({top: scrollY + top - offset, behavior:'smooth'});
+}
+
 function knownCount(){
   let n=0;
   for(const c of DATA.categories) for(const q of c.questions)
@@ -710,6 +744,7 @@ function renderReader(){
       const st = qstatus(k);
       const qEl = document.createElement('div');
       qEl.className = 'q';
+      qEl.dataset.k = k;
       qEl.innerHTML =
         '<div class="q-head">'+
           '<span class="dbadge '+q.depth+'" title="'+DEPTH_LABEL[q.depth]+'"></span>'+
@@ -878,9 +913,20 @@ function renderCheck(){
       const k = chkKey(ci,ii);
       const on = !!state.chk[k];
       if(on){ done++; catDone++; }
+      // чипи питань, що покривають пункт: колір = статус вивчення, клік = перехід у читалку
+      const refs = (it.qs||[]).filter(r=>Q_BY_KEY[r]);
+      const refsHtml = refs.length
+        ? '<span class="chk-refs">'+refs.map(r=>{
+            const hit = Q_BY_KEY[r];
+            const st = qstatus(r);
+            return '<button class="qref'+(st!=='new'?' '+st:'')+'" data-key="'+r+'" '+
+              'title="'+esc(hit.cat.name+' · '+hit.q.title)+'">'+
+              STATUS_TXT[st].charAt(0)+' '+hit.q.id+'</button>';
+          }).join('')+'</span>'
+        : '';
       return '<div class="chk-item'+(on?' done':'')+'" data-k="'+k+'">'+
         '<span class="chk-box">✓</span>'+
-        '<span class="chk-text"><span class="dbadge '+it.depth+'" title="'+DEPTH_LABEL[it.depth]+'"></span>'+esc(it.text)+'</span>'+
+        '<span class="chk-text"><span class="dbadge '+it.depth+'" title="'+DEPTH_LABEL[it.depth]+'"></span>'+esc(it.text)+refsHtml+'</span>'+
       '</div>';
     }).join('');
     el.innerHTML =
@@ -899,6 +945,9 @@ function renderCheck(){
       saveProgress(); renderCheck();
     };
   });
+  root.querySelectorAll('.qref').forEach(btn=>{
+    btn.onclick = e=>{ e.stopPropagation(); openQuestion(btn.dataset.key); };
+  });
 }
 
 /* ============================================================
@@ -909,6 +958,7 @@ function switchTab(name){
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id==='view-'+name));
   state.tab = name; save();
   if(name==='cards' && !deck.length) rebuildDeck();
+  if(name==='check') renderCheck(); // освіжити кольори чипів питань після навчання
 }
 function applyTheme(){
   document.documentElement.setAttribute('data-theme', state.theme);
@@ -948,14 +998,17 @@ function init(){
     }
   };
   document.addEventListener('keydown', e=>{
-    if(state.tab!=='cards') return;
     if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA') return;
-    if(e.code==='Space'){ const b=$('#revealBtn'); if(b){ e.preventDefault(); b.click(); } }
-    else if(e.key==='1'){ const b=$('#repeatBtn'); if(b) b.click(); }
-    else if(e.key==='2'){ const b=$('#knowBtn'); if(b) b.click(); }
+    if(state.tab==='cards'){
+      if(e.code==='Space'){ const b=$('#revealBtn'); if(b){ e.preventDefault(); b.click(); } }
+      else if(e.key==='1'){ const b=$('#repeatBtn'); if(b) b.click(); }
+      else if(e.key==='2'){ const b=$('#knowBtn'); if(b) b.click(); }
+    }
   });
 
-  switchTab(state.tab || 'reader');
+  // збережена вкладка могла зникнути з застосунку — тоді відкриваємо читалку
+  const savedTab = state.tab || 'reader';
+  switchTab(document.querySelector('.tab[data-tab="'+savedTab+'"]') ? savedTab : 'reader');
 }
 syncOnLoad().catch(()=>{}); // непередбачена помилка синку не має зупиняти застосунок
 init();

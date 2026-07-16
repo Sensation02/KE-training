@@ -39,6 +39,11 @@ DEPTH = {"🟣": "deep", "🔵": "mid", "🟢": "aware"}
 # а не мовчазний пропуск.
 CHECKLIST_ITEM_RE = re.compile(r"^- \[[ xX]\] (🟣|🔵|🟢)\s*(.*)$")
 
+# посилання пункту чеклиста на питання, що його покривають:
+# '<!-- q:front-end/Q1 -->' або кілька через кому '<!-- q:front-end/Q1, back-end/Q3 -->'.
+# HTML-коментар — щоб у звичайному перегляді .md посилання не було видно.
+CHECKLIST_QREF_RE = re.compile(r"<!--\s*q:\s*([^>]*?)\s*-->")
+
 
 def parse_frontmatter(text):
     """Повертає (meta: dict, body: str)."""
@@ -79,7 +84,12 @@ def parse_questions(body):
 
 
 def parse_checklist(text):
-    """Категорії чеклиста з пунктами компетенцій."""
+    """Категорії чеклиста з пунктами компетенцій.
+
+    З тексту пункту витягуються (і прибираються) посилання на питання
+    <!-- q:section/QN, ... --> — вони йдуть у поле "qs" як ключі
+    'section:QN' (той самий формат, що qkey() у шаблоні).
+    """
     cats = []
     cur = None
     for line in text.splitlines():
@@ -90,10 +100,55 @@ def parse_checklist(text):
             continue
         it = CHECKLIST_ITEM_RE.match(line)
         if it and cur is not None:
+            raw = it.group(2).strip()
+            qs = []
+            for m in CHECKLIST_QREF_RE.finditer(raw):
+                for ref in m.group(1).split(","):
+                    ref = ref.strip()
+                    if ref:
+                        qs.append(ref.replace("/", ":", 1))
+            text_clean = CHECKLIST_QREF_RE.sub("", raw).strip()
             cur["items"].append(
-                {"depth": DEPTH[it.group(1)], "text": it.group(2).strip()}
+                {"depth": DEPTH[it.group(1)], "text": text_clean, "qs": qs}
             )
     return [c for c in cats if c["items"]]
+
+
+def validate_question_refs(checklist, categories, level_name, checklist_name):
+    """Перевіряє посилання пунктів чеклиста на питання.
+
+    Повертає (errors, warnings):
+      - error: посилання на неіснуючий розділ/питання (битий реф — збірка падає,
+        інакше в UI з'явився б мертвий чип);
+      - warning: пункт чеклиста без жодного посилання, або питання, на яке не
+        посилається жоден пункт (прогалина покриття — не фатально, але видимо).
+    """
+    valid = {
+        f"{cat['key']}:{q['id']}" for cat in categories for q in cat["questions"]
+    }
+    errors, warnings = [], []
+    referenced = set()
+    for cat in checklist:
+        for it in cat["items"]:
+            if not it["qs"]:
+                warnings.append(
+                    f"[{level_name}/{checklist_name}] пункт без посилання на "
+                    f"питання (<!-- q:... -->): «{it['text'][:60]}…»"
+                )
+            for ref in it["qs"]:
+                referenced.add(ref)
+                if ref not in valid:
+                    errors.append(
+                        f"[{level_name}/{checklist_name}] посилання на "
+                        f"неіснуюче питання {ref.replace(':', '/', 1)!r} "
+                        f"у пункті «{it['text'][:60]}…»"
+                    )
+    for ref in sorted(valid - referenced):
+        warnings.append(
+            f"[{level_name}] питання {ref.replace(':', '/', 1)} не покриває "
+            f"жодного пункту чеклиста"
+        )
+    return errors, warnings
 
 
 def validate_checklist_lines(text, checklist_path, level_name):
@@ -163,7 +218,7 @@ def section_key(fname):
     return strip_prefix(fname).lower()
 
 
-def collect_level_data(level_dir, errors):
+def collect_level_data(level_dir, errors, warnings):
     """Парсить і валідує один рівень; усі знайдені проблеми додає в errors.
 
     Спільна для build і check логіка: жодна з перелічених нижче проблем
@@ -180,7 +235,9 @@ def collect_level_data(level_dir, errors):
       4. чеклист має ≥1 валідний пункт, і кожен рядок, схожий на пункт
          чеклиста, повністю відповідає формату '- [ ] 🟣|🔵|🟢 текст'
          (той самий регекс, що й у parse_checklist);
-      5. рівень сумарно має ≥1 питання.
+      5. рівень сумарно має ≥1 питання;
+      6. посилання пунктів чеклиста на питання (<!-- q:... -->) резолвляться
+         (битий реф — error; прогалини покриття йдуть у warnings).
 
     Повертає дані рівня (для рендеру HTML), або None, якщо рівень
     настільки зламаний (немає розділів і/або чеклиста), що дані зібрати
@@ -237,6 +294,11 @@ def collect_level_data(level_dir, errors):
     checklist_text = checklist_path.read_text(encoding="utf-8")
     checklist = parse_checklist(checklist_text)
     errors.extend(validate_checklist_lines(checklist_text, checklist_path, level_name))
+    ref_errors, ref_warnings = validate_question_refs(
+        checklist, categories, level_name, checklist_path.name
+    )
+    errors.extend(ref_errors)
+    warnings.extend(ref_warnings)
 
     total_items = sum(len(c["items"]) for c in checklist)
     if total_items == 0:
@@ -393,9 +455,10 @@ def run_pipeline(check_only):
     level_dirs = discover_levels()
 
     errors = []
+    warnings = []
     level_data = []
     for level_dir in level_dirs:
-        data = collect_level_data(level_dir, errors)
+        data = collect_level_data(level_dir, errors, warnings)
         level_data.append((level_dir, data))
 
     if errors:
@@ -403,6 +466,11 @@ def run_pipeline(check_only):
         for e in errors:
             print(f"  - {e}", file=sys.stderr)
         raise SystemExit(1)
+
+    if warnings:
+        print(f"WARN: {len(warnings)} попередження покриття (не фатально):", file=sys.stderr)
+        for w in warnings:
+            print(f"  - {w}", file=sys.stderr)
 
     if check_only:
         for level_dir, data in level_data:
