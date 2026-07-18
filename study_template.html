@@ -514,11 +514,17 @@ function openQuestion(key){
   switchTab('reader');
   const qEl = document.querySelector('.q[data-k="'+key+'"]');
   if(!qEl) return;
-  if(!qEl.classList.contains('open')) qEl.querySelector('.q-head').click();
-  const offset = (parseInt(getComputedStyle(document.documentElement)
-    .getPropertyValue('--stick-top')) || 86) + 8;
-  const top = qEl.getBoundingClientRect().top;
-  window.scrollTo({top: scrollY + top - offset, behavior:'smooth'});
+  if(!qEl.classList.contains('open')) qEl.querySelector('.q-head').click(); // клік сам доскролить
+  else scrollQuestionToTop(qEl);
+}
+
+// Скрол «запитання під липкий топбар». Заголовок відкритого запитання липкий
+// (.q.open .q-head, top:--stick-top), тож після цього скролу він лишається
+// зафіксованим зверху, а відповідь читається з початку.
+function scrollQuestionToTop(qEl){
+  const offset = parseInt(getComputedStyle(document.documentElement)
+    .getPropertyValue('--stick-top')) || 86;
+  window.scrollTo({top: scrollY + qEl.getBoundingClientRect().top - offset, behavior:'smooth'});
 }
 
 function knownCount(){
@@ -782,6 +788,10 @@ function renderReader(){
             .getPropertyValue('--stick-top')) || 86;
           const top = qEl.getBoundingClientRect().top; // вже з урахуванням згорнутого layout
           if(top < offset) window.scrollTo({top: scrollY + top - offset});
+        }else{
+          // відкрили — підвозимо запитання під топбар, звідти воно й читається:
+          // заголовок пришпилюється (sticky), відповідь починається одразу під ним
+          scrollQuestionToTop(qEl);
         }
       };
       stBtn.onclick = (e)=>{
