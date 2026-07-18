@@ -32,6 +32,11 @@ SECTION_RE = re.compile(r"^(\d+)_.+\.md$")
 # емодзі глибини → внутрішній код
 DEPTH = {"🟣": "deep", "🔵": "mid", "🟢": "aware"}
 
+# блок «🎯 Відповідь на іспиті» — обов'язковий ПЕРШИЙ абзац кожної відповіді:
+# еталонна усна відповідь для флеш-карток (див. ANSWER_SCHEMA.md). Витягується
+# в окреме поле "exam" і прибирається з "md" (у читалці рендериться окремо).
+EXAM_RE = re.compile(r"^\*\*🎯 Відповідь на іспиті:\*\*\s*(.+?)(?:\n\s*\n|\Z)", re.S)
+
 # пункт чеклиста: '- [ ] 🟣|🔵|🟢 текст'. ЄДИНИЙ регекс і для парсингу
 # (parse_checklist), і для валідації (validate_checklist_lines) — щоб вони
 # ніколи не розійшлись: рядок, схожий на пункт (починається з '- [' після
@@ -77,8 +82,13 @@ def parse_questions(body):
         answer = parts[i + 2].strip()
         # прибрати роздільник '---', що стоїть перед наступним питанням
         answer = re.sub(r"\s*\n---\s*$", "", answer).strip()
+        exam = ""
+        m = EXAM_RE.match(answer)
+        if m:
+            exam = m.group(1).strip()
+            answer = answer[m.end():].strip()
         questions.append(
-            {"id": num, "title": title, "depth": depth, "md": answer}
+            {"id": num, "title": title, "depth": depth, "exam": exam, "md": answer}
         )
     return questions
 
@@ -229,8 +239,8 @@ def collect_level_data(level_dir, errors, warnings):
 
     Перевіряються інваріанти:
       1. рівень має ≥1 файл розділу NN_*.md і рівно один *_Checklist.md;
-      2. кожне питання має номер (QN), непорожній заголовок і непорожнє
-         тіло відповіді;
+      2. кожне питання має номер (QN), непорожній заголовок, непорожнє
+         тіло відповіді і блок «🎯 Відповідь на іспиті» першим абзацом;
       3. глибина кожного питання ∈ {deep, mid, aware};
       4. чеклист має ≥1 валідний пункт, і кожен рядок, схожий на пункт
          чеклиста, повністю відповідає формату '- [ ] 🟣|🔵|🟢 текст'
@@ -274,6 +284,11 @@ def collect_level_data(level_dir, errors, warnings):
                 errors.append(f"{loc}: порожній заголовок питання")
             if not q["md"].strip():
                 errors.append(f"{loc}: порожнє тіло відповіді")
+            if not q["exam"]:
+                errors.append(
+                    f"{loc}: немає блоку «**🎯 Відповідь на іспиті:** …» "
+                    f"першим абзацом відповіді (див. ANSWER_SCHEMA.md)"
+                )
             if q["depth"] not in DEPTH.values():
                 errors.append(
                     f"{loc}: недійсний код глибини {q['depth']!r} "

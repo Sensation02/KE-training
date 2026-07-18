@@ -141,6 +141,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .empty{text-align:center;padding:60px 20px;color:var(--mute)}
 .empty .big{font-size:34px;margin-bottom:10px}
 
+/* ============ Блок «🎯 Відповідь на іспиті» ============ */
+.exam{border:1px solid var(--accent);background:var(--accent-soft);
+  border-radius:12px;padding:12px 14px;margin-bottom:14px}
+.exam-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:7px;font-weight:600}
+.full-toggle{text-align:center;padding-top:14px}
+
 /* ============ Флеш-картки ============ */
 .deck-wrap{display:flex;flex-direction:column;align-items:center;gap:18px}
 .deck-bar{width:100%;display:flex;align-items:center;gap:14px;justify-content:center;
@@ -651,6 +658,14 @@ function renderMarkdown(mdText){
 const mdCache = {};
 function md(k, text){ return mdCache[k] || (mdCache[k] = renderMarkdown(text)); }
 
+// Блок «🎯 Відповідь на іспиті» — еталон усної відповіді (поле q.exam,
+// збірка гарантує його наявність). Ключ кеша '#exam' не перетинається
+// з ключами повних відповідей (там 'section:QN').
+function examHtml(key, q){
+  return '<div class="exam"><div class="exam-label">🎯 Відповідь на іспиті</div>'+
+    md(key+'#exam', q.exam)+'</div>';
+}
+
 /* ============================================================
    ЗАГАЛЬНИЙ ПРОГРЕС
    ============================================================ */
@@ -710,7 +725,8 @@ function matchQ(cat, q){
   if(filter.hideKnown && qstatus(qkey(cat,q))==='known') return false;
   if(filter.search){
     const s = filter.search.toLowerCase();
-    if(!(q.title.toLowerCase().includes(s) || q.md.toLowerCase().includes(s))) return false;
+    if(!(q.title.toLowerCase().includes(s) || q.md.toLowerCase().includes(s) ||
+         (q.exam||'').toLowerCase().includes(s))) return false;
   }
   return true;
 }
@@ -757,7 +773,7 @@ function renderReader(){
       const stBtn = qEl.querySelector('.status');
       head.onclick = (e)=>{
         if(e.target === stBtn) return;
-        if(!ans.innerHTML) ans.innerHTML = md(k, q.md);
+        if(!ans.innerHTML) ans.innerHTML = examHtml(k, q) + md(k, q.md);
         const willClose = qEl.classList.contains('open');
         qEl.classList.toggle('open');
         if(willClose){
@@ -794,7 +810,9 @@ function renderReader(){
    ФЛЕШ-КАРТКИ
    ============================================================ */
 let deckFilter = {cat:'all', depth:'all', onlyNew:false, shuffle:false};
-let deck = [], deckIdx = 0, revealed = false;
+// revealed — показано еталон «🎯 Відповідь на іспиті» (мішень самоперевірки);
+// fullShown — додатково розгорнуто повний міні-урок (за кнопкою)
+let deck = [], deckIdx = 0, revealed = false, fullShown = false;
 
 function buildDeckControls(){
   const c = $('#deckControls');
@@ -844,7 +862,7 @@ function rebuildDeck(){
   if(deckFilter.shuffle){
     for(let i=deck.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=deck[i]; deck[i]=deck[j]; deck[j]=t; }
   }
-  deckIdx = 0; revealed = false;
+  deckIdx = 0; revealed = false; fullShown = false;
   renderCard();
 }
 
@@ -878,8 +896,12 @@ function renderCard(){
       '</div>'+
       '<div class="card-q"><span style="font-family:var(--mono);font-size:.7em;color:var(--mute)">'+q.id+'&nbsp;&nbsp;</span>'+esc(q.title)+'</div>'+
       (revealed
-        ? '<div class="card-a md">'+md(key,q.md)+'</div>'
-        : '<div class="reveal-hint">Спробуй відповісти подумки, тоді розкрий ↓</div>')+
+        ? '<div class="card-a md">'+examHtml(key,q)+
+            (fullShown
+              ? md(key,q.md)
+              : '<div class="full-toggle"><button class="mini-btn" id="fullBtn">📖 Повний розбір</button></div>')+
+          '</div>'
+        : '<div class="reveal-hint">Спробуй відповісти вголос, тоді звір з еталоном ↓</div>')+
       (revealed
         ? '<div class="deck-actions">'+
             '<button class="btn repeat" id="repeatBtn">↻ Повторити <kbd>1</kbd></button>'+
@@ -889,10 +911,12 @@ function renderCard(){
     '</div>';
 
   if(revealed){
-    $('#repeatBtn').onclick = ()=>{ setStatus(key,'learning'); const c=deck.splice(deckIdx,1)[0]; deck.push(c); revealed=false; renderCard(); };
-    $('#knowBtn').onclick = ()=>{ setStatus(key,'known'); deckIdx++; revealed=false; renderCard(); };
+    $('#repeatBtn').onclick = ()=>{ setStatus(key,'learning'); const c=deck.splice(deckIdx,1)[0]; deck.push(c); revealed=false; fullShown=false; renderCard(); };
+    $('#knowBtn').onclick = ()=>{ setStatus(key,'known'); deckIdx++; revealed=false; fullShown=false; renderCard(); };
+    const fb = $('#fullBtn');
+    if(fb) fb.onclick = ()=>{ fullShown=true; renderCard(); };
   }else{
-    $('#revealBtn').onclick = ()=>{ revealed=true; renderCard(); };
+    $('#revealBtn').onclick = ()=>{ revealed=true; fullShown=false; renderCard(); };
   }
 }
 
@@ -1000,7 +1024,8 @@ function init(){
   document.addEventListener('keydown', e=>{
     if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA') return;
     if(state.tab==='cards'){
-      if(e.code==='Space'){ const b=$('#revealBtn'); if(b){ e.preventDefault(); b.click(); } }
+      // Space: спершу розкриває еталон, повторне натискання — повний розбір
+      if(e.code==='Space'){ const b=$('#revealBtn')||$('#fullBtn'); if(b){ e.preventDefault(); b.click(); } }
       else if(e.key==='1'){ const b=$('#repeatBtn'); if(b) b.click(); }
       else if(e.key==='2'){ const b=$('#knowBtn'); if(b) b.click(); }
     }
