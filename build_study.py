@@ -296,11 +296,12 @@ def collect_level_data(level_dir, errors, warnings):
                 )
             total_q += 1
             depth_counts[q["depth"]] = depth_counts.get(q["depth"], 0) + 1
+        # у JSON ідуть лише поля, які реально читає шаблон (key/name/questions);
+        # решта frontmatter (stack, source, purpose…) — документація самого .md
         categories.append(
             {
                 "key": section_key(path.name),
                 "name": meta.get("title") or humanize(path.name),
-                "stack": meta.get("stack", ""),
                 "questions": questions,
             }
         )
