@@ -2,9 +2,15 @@
 """PWA-артефакти для build_study.py: маніфест, іконки, service worker.
 
 Іконки растеризуються build-time чистим stdlib (zlib+struct для PNG-кодування,
-проста геометрія прямокутників/діагоналей для монограми «KE» з 4x-суперсемплінгом
-для згладжених країв) — без Pillow чи інших залежностей, узгоджено з рештою
+проста геометрія прямокутників/діагоналей/шевронів з 4x-суперсемплінгом для
+згладжених країв) — без Pillow чи інших залежностей, узгоджено з рештою
 проєкту («Залежностей, крім python3, не потрібно», див. README.md).
+
+Дизайн іконки «Комета» (затверджений 2026-07-21, див.
+docs/superpowers/specs/2026-07-21-app-icon-comet-design.md): темне тло,
+білі літери «KE» в нижній половині, акцентний шеврон-стрілка, крила якого
+сідають на верхні кути літер, і два шеврони-«сліди» вище — кожен на 20%
+менший і темніший за попередній (геометрична прогресія ×0.8).
 
 Кеш-версія service worker'а — детермінований SHA-256 від (шлях, вміст) усіх
 файлів, уже записаних у dist/ на момент виклику compute_cache_version(). Це
@@ -23,13 +29,17 @@ import zlib
 # збігатися з --accent (study_template.html:14) і --bg (study_template.html:11);
 # при зміні палітри шаблону оновити вручну і тут (наступна збірка перегенерує
 # іконки/маніфест/theme-color, але лише з цих констант).
-# Іконки: суцільне тло кольором акценту (без прозорості — обов'язково для
+# Іконка dark-first: суцільне темне тло --bg (без прозорості — обов'язково для
 # apple-touch-icon і для maskable: ОС сама накладає власну маску форми поверх
-# повністю непрозорого квадрата). Букви — білі: той самий контраст, що й
-# .btn.primary/.tab.active у шаблоні (background:var(--accent); color:#fff).
+# повністю непрозорого квадрата). Літери — білі (контраст як у .btn.primary),
+# основний шеврон — акцент; сліди — той самий відтінок, пригашений до тла
+# двома кроками (кольори передобчислені, бо рендерер без альфа-каналу).
 # ---------------------------------------------------------------------------
-ACCENT_RGB = (0x7C, 0x6C, 0xFF)  # = --accent (#7c6cff)
-GLYPH_RGB = (0xFF, 0xFF, 0xFF)   # білий текст на акцентному тлі
+ICON_BG_RGB = (0x0D, 0x0F, 0x14)        # = --bg темної теми (#0d0f14)
+LETTER_RGB = (0xFF, 0xFF, 0xFF)         # білі літери «KE»
+CHEVRON_MAIN_RGB = (0x7C, 0x6C, 0xFF)   # = --accent (#7c6cff)
+CHEVRON_ECHO1_RGB = (0x5B, 0x4F, 0xC0)  # слід 1: акцент, пригашений до тла
+CHEVRON_ECHO2_RGB = (0x3E, 0x35, 0x84)  # слід 2: ще один крок до тла
 
 MANIFEST_BG = "#0d0f14"     # = --bg (темна тема) — фон сплеш-скріна
 MANIFEST_THEME = "#7c6cff"  # = --accent — колір хрому ОС/браузера і theme-color
@@ -74,55 +84,79 @@ def encode_png(width, height, rows):
 
 
 # =============================================================================
-# Монограма «KE»: прямокутні штрихи (E) + лінійна інтерполяція по рядку (K).
-# Геометрія обчислюється пропорційно до `unit` (розмір канвасу з урахуванням
-# суперсемплінгу) — тому не пікселізується на жодному з трьох розмірів іконок.
-# _metrics() — єдине джерело цієї геометрії: і растровий _row_ranges()
-# (PNG-іконки), і векторний render_icon_svg() (SVG-фавікон) рахують від тих
-# самих чисел, тому растр і вектор завжди лишаються однією й тією ж монограмою.
+# Знак «Комета»: монограма «KE» (прямокутні штрихи E + діагоналі K лінійною
+# інтерполяцією по рядку) під трьома шевронами. Геометрія обчислюється
+# пропорційно до `unit` (розмір канвасу з урахуванням суперсемплінгу) — тому
+# не пікселізується на жодному з розмірів іконок. _metrics()/_chevrons() —
+# єдине джерело цієї геометрії: і растрові *_ranges() (PNG-іконки), і
+# векторний render_icon_svg() (SVG-фавікон) рахують від тих самих чисел,
+# тому растр і вектор завжди лишаються одним і тим самим знаком.
 # =============================================================================
 def _metrics(unit):
-    """gh=0.44*unit тримає найдальші кути монограми на відстані ~0.37*unit від
-    центру — у межах maskable safe-zone (кути мають лишатись у колі радіусом
-    0.40*unit від центру, інакше ОС-маска (коло/сквіркл) обріже літери)."""
-    gh = unit * 0.44    # висота гліфа
+    """Метрики літер «KE». gh=0.28·unit і y0=0.50·unit тримають нижні кути
+    монограми на відстані ~0.34·unit від центру, а апекс найдальшого сліду
+    (див. _chevrons) — на 0.38·unit: усе в межах maskable safe-zone (коло
+    радіусом 0.40·unit від центру, інакше ОС-маска обріже знак).
+
+    «K» без тонких діагоналей: горизонтальна півширина діагоналі hw=0.66·sw
+    компенсує кут нахилу ~50° (перпендикулярна товщина ≈ sw, як у вертикалей);
+    діагоналі сходяться на правому краї вертикалі (jx), а не в центрі штриха;
+    нижня нога винесена назовні на kick для оптичного балансу."""
+    gh = unit * 0.28    # висота гліфа
     sw = gh * 0.20      # товщина штриха
     ew = gh * 0.58      # ширина "E"
     kw = gh * 0.62      # ширина "K"
     gap = gh * 0.16     # відстань між літерами
     x0 = (unit - (ew + gap + kw)) / 2
-    y0 = (unit - gh) / 2
+    y0 = unit * 0.50
     kx0 = x0
     ex0 = x0 + kw + gap
     return {
         "gh": gh, "sw": sw, "ew": ew, "kw": kw,
         "x0": x0, "y0": y0, "kx0": kx0, "ex0": ex0,
-        "cx": kx0 + sw / 2, "cy": y0 + gh / 2,
+        "jx": kx0 + sw,          # стик діагоналей: правий край вертикалі K
+        "jy": y0 + gh / 2,
+        "ktx": kx0 + kw,         # x верхнього кута K
+        "hw": sw * 0.66,         # горизонтальна півширина діагоналей K
+        "kick": gh * 0.03,       # винос нижньої ноги K назовні
     }
 
 
-def _row_ranges(y, unit):
-    """Зафарбовані діапазони [(x0,x1), ...] по вертикалі y канвасу unit×unit."""
+def _chevrons(unit):
+    """Шеврони знизу вгору: (RGB, ay, hs, d, th) — y апекса, піврозмах,
+    вертикальний спад крила, вертикальна товщина. Кожен наступний слід —
+    ×0.8 за всіма трьома вимірами (геометрична прогресія «віддалення»).
+    Кінці крил основного шеврона (cx±hs, ay+d+th) = (0.30, 0.50) і
+    (0.70, 0.50)·unit — точно на верхній лінії літер (стик «одного знака»)."""
+    u = unit / 100.0
+    return [
+        (CHEVRON_MAIN_RGB, 31.0 * u, 20.0 * u, 13.0 * u, 6.0 * u),
+        (CHEVRON_ECHO1_RGB, 21.0 * u, 16.0 * u, 10.4 * u, 4.8 * u),
+        (CHEVRON_ECHO2_RGB, 12.0 * u, 12.8 * u, 8.32 * u, 3.84 * u),
+    ]
+
+
+def _letter_ranges(y, unit):
+    """Зафарбовані діапазони [(x0,x1), ...] літер «KE» по вертикалі y."""
     m = _metrics(unit)
-    gh, sw, ew, kw = m["gh"], m["sw"], m["ew"], m["kw"]
-    x0, y0, kx0, ex0 = m["x0"], m["y0"], m["kx0"], m["ex0"]
-    cx, cy = m["cx"], m["cy"]
+    gh, sw, ew = m["gh"], m["sw"], m["ew"]
+    y0, kx0, ex0 = m["y0"], m["kx0"], m["ex0"]
+    jx, jy, ktx, hw, kick = m["jx"], m["jy"], m["ktx"], m["hw"], m["kick"]
     if not (y0 <= y < y0 + gh):
         return []
 
     ranges = []
 
-    # ---- K (ліворуч): вертикаль + дві діагоналі від середини вертикалі до кутів ----
+    # ---- K (ліворуч): вертикаль + дві діагоналі від краю вертикалі до кутів ----
     ranges.append((kx0, kx0 + sw))
-    half = sw / 2
-    if y <= cy:
-        t = 0.0 if cy == y0 else (cy - y) / (cy - y0)
-        xc = cx + (kx0 + kw - cx) * t
-        ranges.append((xc - half, xc + half))
-    if y >= cy:
-        t = 0.0 if cy == y0 + gh else (y - cy) / (y0 + gh - cy)
-        xc = cx + (kx0 + kw - cx) * t
-        ranges.append((xc - half, xc + half))
+    if y <= jy:
+        t = 0.0 if jy == y0 else (jy - y) / (jy - y0)
+        xc = jx + (ktx - jx) * t
+        ranges.append((xc - hw, xc + hw))
+    if y >= jy:
+        t = 0.0 if jy == y0 + gh else (y - jy) / (y0 + gh - jy)
+        xc = jx + (ktx + kick - jx) * t
+        ranges.append((xc - hw, xc + hw))
 
     # ---- E (праворуч): вертикаль + верхня/нижня горизонталі + коротша середня ----
     ranges.append((ex0, ex0 + sw))
@@ -135,81 +169,128 @@ def _row_ranges(y, unit):
     return ranges
 
 
-def _mask_row(y, unit):
-    """Маска покриття рядка (bytearray довжини unit, 0 або 255)."""
+def _chevron_ranges(y, unit, ay, hs, d, th):
+    """Діапазони одного шеврона по вертикалі y: зовнішня межа крила — лінія
+    від апекса (cx, ay) до (cx±hs, ay+d), внутрішня — та сама лінія, зсунута
+    вниз на th; біля апекса внутрішня ще не почалась і крила зливаються."""
+    if not (ay <= y < ay + d + th):
+        return []
+    cx = unit / 2.0
+    hi = min(hs, hs * (y - ay) / d)
+    lo = max(0.0, hs * (y - ay - th) / d) if y >= ay + th else 0.0
+    if hi <= lo:
+        return []
+    if lo <= 0:
+        return [(cx - hi, cx + hi)]
+    return [(cx - hi, cx - lo), (cx + lo, cx + hi)]
+
+
+def _glyph_layers(unit):
+    """Шари знака: (RGB, функція y → діапазони). Шари не перетинаються, тож
+    порядок важливий лише на стиках (літери малюються останніми)."""
+    layers = [
+        (rgb, (lambda yy, a=ay, h=hs, dd=d, t=th:
+               _chevron_ranges(yy, unit, a, h, dd, t)))
+        for rgb, ay, hs, d, th in _chevrons(unit)
+    ]
+    layers.append((LETTER_RGB, lambda yy: _letter_ranges(yy, unit)))
+    return layers
+
+
+def _index_row(y, unit, layers):
+    """Карта шарів рядка (bytearray довжини unit: 0 = тло, i = layers[i-1])."""
     row = bytearray(unit)
-    for rx0, rx1 in _row_ranges(y, unit):
-        ix0 = max(0, int(round(rx0)))
-        ix1 = min(unit, int(round(rx1)))
-        if ix1 > ix0:
-            row[ix0:ix1] = b"\xff" * (ix1 - ix0)
+    for i, (_rgb, ranges_fn) in enumerate(layers, start=1):
+        fill = bytes([i])
+        for rx0, rx1 in ranges_fn(y):
+            ix0 = max(0, int(round(rx0)))
+            ix1 = min(unit, int(round(rx1)))
+            if ix1 > ix0:
+                row[ix0:ix1] = fill * (ix1 - ix0)
     return row
 
 
 def render_icon(size):
-    """PNG size×size: суцільне тло ACCENT_RGB + монограма «KE» кольору
-    GLYPH_RGB, з 4x-суперсемплінгом (усереднення блоків) для згладжених країв.
-    Без alpha-каналу (повністю непрозоре) — коректно і для maskable (ОС сама
-    накладає маску форми), і для apple-touch-icon (iOS не любить прозорість)."""
+    """PNG size×size: суцільне тло ICON_BG_RGB + багатоколірний знак
+    (три шеврони + білі літери), з 4x-суперсемплінгом (усереднення RGB
+    блоків 4×4) для згладжених країв. Без alpha-каналу (повністю
+    непрозоре) — коректно і для maskable (ОС сама накладає маску форми),
+    і для apple-touch-icon (iOS не любить прозорість)."""
     ss = SUPERSAMPLE
     big = size * ss
-    mask_rows = [_mask_row(y, big) for y in range(big)]
+    layers = _glyph_layers(big)
+    palette = [ICON_BG_RGB] + [rgb for rgb, _fn in layers]
+    index_rows = [_index_row(y, big, layers) for y in range(big)]
 
+    n = ss * ss
     rows = []
     for by in range(size):
         row = bytearray(size * 3)
-        src_rows = mask_rows[by * ss : (by + 1) * ss]
+        src_rows = index_rows[by * ss : (by + 1) * ss]
         for bx in range(size):
-            total = 0
+            r = g = b = 0
             bx0, bx1 = bx * ss, (bx + 1) * ss
             for sr in src_rows:
-                total += sum(sr[bx0:bx1])
-            alpha = total / (255 * ss * ss)  # частка покриття гліфом, 0..1
+                for idx in sr[bx0:bx1]:
+                    pr, pg, pb = palette[idx]
+                    r += pr
+                    g += pg
+                    b += pb
             off = bx * 3
-            for c in range(3):
-                v = ACCENT_RGB[c] + (GLYPH_RGB[c] - ACCENT_RGB[c]) * alpha
-                row[off + c] = max(0, min(255, round(v)))
+            row[off] = round(r / n)
+            row[off + 1] = round(g / n)
+            row[off + 2] = round(b / n)
         rows.append(bytes(row))
     return encode_png(size, size, rows)
 
 
 def render_icon_svg():
-    """Векторна (SVG) версія тієї самої монограми «KE», що й render_icon() —
+    """Векторна (SVG) версія того самого знака «Комета», що й render_icon() —
     для favicon вкладки браузера: різкий на будь-якому масштабі й розмірі
     (на відміну від растрового favicon.ico), і той самий силует, що й
-    growable PWA-іконки, тож вкладка і встановлений застосунок виглядають
-    як один і той самий значок. Геометрія — з _metrics(), а не окремі числа,
-    тому не може розійтися з растровими icon-192/512."""
+    растрові PWA-іконки, тож вкладка і встановлений застосунок виглядають
+    як один і той самий значок. Геометрія — з _metrics()/_chevrons(), а не
+    окремі числа, тому не може розійтися з растровими icon-192/512."""
     unit = 100
     m = _metrics(unit)
-    gh, sw, ew, kw = m["gh"], m["sw"], m["ew"], m["kw"]
+    gh, sw, ew = m["gh"], m["sw"], m["ew"]
     y0, kx0, ex0 = m["y0"], m["kx0"], m["ex0"]
-    cx, cy = m["cx"], m["cy"]
-    half = sw / 2
-    accent = "#%02x%02x%02x" % ACCENT_RGB
-    glyph = "#%02x%02x%02x" % GLYPH_RGB
+    jx, jy, ktx, hw, kick = m["jx"], m["jy"], m["ktx"], m["hw"], m["kick"]
+    cx = unit / 2.0
+    bg = "#%02x%02x%02x" % ICON_BG_RGB
+    letter = "#%02x%02x%02x" % LETTER_RGB
 
-    def rect(x, y, w, h):
-        return f'<rect x="{x:.3f}" y="{y:.3f}" width="{w:.3f}" height="{h:.3f}" fill="{glyph}"/>'
+    def rect(x, y, w, h, fill):
+        return f'<rect x="{x:.3f}" y="{y:.3f}" width="{w:.3f}" height="{h:.3f}" fill="{fill}"/>'
 
-    def poly(*points):
+    def poly(fill, *points):
         pts = " ".join(f"{x:.3f},{y:.3f}" for x, y in points)
-        return f'<polygon points="{pts}" fill="{glyph}"/>'
+        return f'<polygon points="{pts}" fill="{fill}"/>'
 
-    shapes = [
-        rect(kx0, y0, sw, gh),  # K: вертикаль
-        # K: верхня діагональ — від верхнього кута до середини вертикалі
-        poly((kx0 + kw - half, y0), (kx0 + kw + half, y0), (cx + half, cy), (cx - half, cy)),
-        # K: нижня діагональ — від середини вертикалі до нижнього кута
-        poly((cx - half, cy), (cx + half, cy), (kx0 + kw + half, y0 + gh), (kx0 + kw - half, y0 + gh)),
-        rect(ex0, y0, sw, gh),               # E: вертикаль
-        rect(ex0, y0, ew, sw),               # E: верхня горизонталь
-        rect(ex0, y0 + gh - sw, ew, sw),     # E: нижня горизонталь
-        rect(ex0, y0 + gh / 2 - sw / 2, ew * 0.86, sw),  # E: коротша середня
+    shapes = []
+    # Шеврони (сліди спершу — далі від глядача, хоча фігури й не перетинаються)
+    for rgb, ay, hs, d, th in reversed(_chevrons(unit)):
+        fill = "#%02x%02x%02x" % rgb
+        shapes.append(poly(
+            fill,
+            (cx, ay), (cx + hs, ay + d), (cx + hs, ay + d + th),
+            (cx, ay + th), (cx - hs, ay + d + th), (cx - hs, ay + d),
+        ))
+    shapes += [
+        rect(kx0, y0, sw, gh, letter),  # K: вертикаль
+        # K: верхня діагональ — від верхнього кута до краю вертикалі
+        poly(letter, (ktx - hw, y0), (ktx + hw, y0), (jx + hw, jy), (jx - hw, jy)),
+        # K: нижня діагональ — від краю вертикалі до винесеного нижнього кута
+        poly(letter, (jx - hw, jy), (jx + hw, jy),
+             (ktx + kick + hw, y0 + gh), (ktx + kick - hw, y0 + gh)),
+        rect(ex0, y0, sw, gh, letter),               # E: вертикаль
+        rect(ex0, y0, ew, sw, letter),               # E: верхня горизонталь
+        rect(ex0, y0 + gh - sw, ew, sw, letter),     # E: нижня горизонталь
+        rect(ex0, y0 + gh / 2 - sw / 2, ew * 0.86, sw, letter),  # E: середня
     ]
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {unit} {unit}">'
-        f'<rect width="{unit}" height="{unit}" fill="{accent}"/>'
+        f'<rect width="{unit}" height="{unit}" fill="{bg}"/>'
         + "".join(shapes)
         + "</svg>"
     )
