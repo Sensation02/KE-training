@@ -42,11 +42,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 
 .topbar{display:flex;align-items:center;flex-wrap:wrap;gap:12px 16px;padding:22px 0 18px;
   position:sticky;top:0;z-index:20;background:var(--bg)}
-.brand{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.brand{display:flex;flex-direction:column;gap:2px;flex:0 1 auto;min-width:0}
 .brand .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;
   text-transform:uppercase;color:var(--accent)}
 .brand h1{font-size:clamp(19px,3.4vw,25px);font-weight:700;letter-spacing:-.02em;line-height:1.1}
-.overall{display:flex;align-items:center;gap:11px;flex:none}
+/* авто-відступи з обох боків центрують прогрес між брендом ліворуч і діями праворуч */
+.overall{display:flex;align-items:center;gap:11px;flex:none;margin-inline:auto}
+.topbar-actions{display:flex;gap:12px;flex:none}
 .ring{--p:0;position:relative;width:46px;height:46px;border-radius:50%;flex:none;
   background:conic-gradient(var(--accent) calc(var(--p)*1%),var(--border) 0);transition:background .5s}
 .ring::after{content:"";position:absolute;inset:5px;background:var(--bg);border-radius:50%}
@@ -244,7 +246,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
   .brand{flex:1 1 100%;order:1}
   .nav-back{order:2}
   .overall{order:3}
-  .icon-btn{order:4;margin-left:auto}
+  .topbar-actions{order:4;gap:10px}
   .tab{font-size:13px;padding:10px 5px}
   .tab .cnt{display:none}
   .card{padding:16px 13px;min-height:300px}
@@ -271,8 +273,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
       <div class="ring" id="ring"><b id="ringPct">0%</b></div>
       <div class="otext"><b id="knownN">0</b>&nbsp;/&nbsp;<span id="totalN">0</span><br>вивчено</div>
     </div>
-    <button class="icon-btn" id="themeBtn" title="Світла / темна тема">◐</button>
-    <button class="icon-btn" id="logoutBtn" title="Вийти з акаунта" aria-label="Вийти з акаунта">⎋</button>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="themeBtn" title="Світла / темна тема">◐</button>
+      <button class="icon-btn" id="logoutBtn" title="Вийти з акаунта" aria-label="Вийти з акаунта">⎋</button>
+    </div>
   </div>
 
   <div class="tabs">
