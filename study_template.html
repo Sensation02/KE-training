@@ -342,6 +342,9 @@ const DATA = window.__DATA__;
 // ключ localStorage містить рівень — прогрес різних рівнів на одному origin не перетирається
 const LS_KEY = window.__LEVEL__ + '_study_v1';
 const OWNER_KEY = 'study_owner_v1';
+// Тема спільна для всіх сторінок origin (коренева + рівні). Навмисно НЕ
+// підпадає під clearLocalProgress: це косметика пристрою, а не прогрес.
+const THEME_KEY = 'study_theme_v1';
 // Прибирає прогрес УСІХ рівнів: localStorage спільний на origin, тож зміна
 // акаунта стосується l2/l3/... одразу, а не лише відкритого рівня.
 function clearLocalProgress(){
@@ -357,10 +360,15 @@ const CAT_COLOR = {'front-end':'#f59e0b','back-end':'#ec4899','databases':'#14b8
 
 /* ---------- Стан / localStorage ---------- */
 function load(){
+  let st;
   try{
-    return Object.assign({theme:'dark',tab:'reader',q:{},chk:{},updatedAt:0},
+    st = Object.assign({theme:'dark',tab:'reader',q:{},chk:{},updatedAt:0},
       JSON.parse(localStorage.getItem(LS_KEY)||'{}'));
-  }catch(e){ return {theme:'dark',tab:'reader',q:{},chk:{},updatedAt:0}; }
+  }catch(e){ st = {theme:'dark',tab:'reader',q:{},chk:{},updatedAt:0}; }
+  // спільний ключ має пріоритет; st.theme лишається фолбеком для міграції
+  // зі старих збережених станів (до появи THEME_KEY)
+  st.theme = localStorage.getItem(THEME_KEY) || st.theme;
+  return st;
 }
 let state = load();
 // save() — для косметичних полів (тема/вкладка/згорнуті категорії): лише локально,
@@ -1031,6 +1039,7 @@ function switchTab(name){
 }
 function applyTheme(){
   document.documentElement.setAttribute('data-theme', state.theme);
+  localStorage.setItem(THEME_KEY, state.theme);
   $('#themeBtn').textContent = state.theme==='dark' ? '☀' : '☾';
 }
 
