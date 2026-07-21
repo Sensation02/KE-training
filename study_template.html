@@ -272,6 +272,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
       <div class="otext"><b id="knownN">0</b>&nbsp;/&nbsp;<span id="totalN">0</span><br>вивчено</div>
     </div>
     <button class="icon-btn" id="themeBtn" title="Світла / темна тема">◐</button>
+    <button class="icon-btn" id="logoutBtn" title="Вийти з акаунта" aria-label="Вийти з акаунта">⎋</button>
   </div>
 
   <div class="tabs">
@@ -1054,6 +1055,18 @@ function init(){
   $('#hideKnown').onchange = e=>{ filter.hideKnown = e.target.checked; renderReader(); };
   document.querySelectorAll('.tab').forEach(t=>t.onclick = ()=>switchTab(t.dataset.tab));
   $('#themeBtn').onclick = ()=>{ state.theme = state.theme==='dark'?'light':'dark'; applyTheme(); save(); };
+  $('#logoutBtn').onclick = async ()=>{
+    // Дотиснути незбережені зміни перед виходом; якщо не вдалося
+    // (офлайн / сесія вже мертва) — вирішує людина.
+    let pushed = true;
+    if(syncArmed){ clearTimeout(syncTimer); pushed = await pushNow(); }
+    if(!pushed && !confirm('Останні зміни не збережено на сервері. Вийти все одно?')) return;
+    clearLocalProgress();
+    localStorage.removeItem(OWNER_KEY);
+    // Вбудований logout Cloudflare Access: стирає кукі сесії,
+    // наступний візит показує форму входу.
+    location.href = '/cdn-cgi/access/logout';
+  };
   $('#resetBtn').onclick = e=>{
     e.preventDefault();
     if(confirm('Скинути весь прогрес (статуси питань і чеклист)?')){
