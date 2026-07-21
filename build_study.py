@@ -361,6 +361,23 @@ def render_level_html(template, level_key, data):
     return out
 
 
+# Світлі змінні окремо: вживаються двічі (системна перевага БЕЗ ручного вибору
+# і явний data-theme="light" від перемикача) — щоб не розсинхронити копії.
+ROOT_LIGHT_VARS = """
+  --bg:#f4f5f8; --panel:#ffffff; --card:#ffffff; --card-hi:#f7f8fa;
+  --border:#e3e6ec; --text:#181b22; --dim:#5b6270; --mute:#8a919e;
+  --accent:#6d4dff; --accent-soft:rgba(109,77,255,.1);
+  --shadow:0 1px 2px rgba(20,30,50,.05),0 8px 24px rgba(20,30,50,.07);
+"""
+
+# Застосувати збережену тему ДО рендера (скрипт у <head> блокує парсинг далі),
+# інакше сторінка блимала б системною темою. Той самий ключ study_theme_v1
+# читають/пишуть сторінки рівнів — тема спільна для всього origin.
+ROOT_THEME_APPLY_SCRIPT = (
+    "<script>try{var t=localStorage.getItem('study_theme_v1');"
+    "if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>\n"
+)
+
 ROOT_INDEX_CSS = """
 :root{
   --bg:#0d0f14; --panel:#161a23; --card:#191d28; --card-hi:#1e2330;
@@ -372,17 +389,17 @@ ROOT_INDEX_CSS = """
   --mono:ui-monospace,'SF Mono','JetBrains Mono',Menlo,Consolas,monospace;
 }
 @media (prefers-color-scheme: light){
-  :root{
-    --bg:#f4f5f8; --panel:#ffffff; --card:#ffffff; --card-hi:#f7f8fa;
-    --border:#e3e6ec; --text:#181b22; --dim:#5b6270; --mute:#8a919e;
-    --accent:#6d4dff; --accent-soft:rgba(109,77,255,.1);
-    --shadow:0 1px 2px rgba(20,30,50,.05),0 8px 24px rgba(20,30,50,.07);
-  }
+  :root:not([data-theme="dark"]){""" + ROOT_LIGHT_VARS + """}
 }
+:root[data-theme="light"]{""" + ROOT_LIGHT_VARS + """}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--font);background:var(--bg);color:var(--text);
   line-height:1.55;-webkit-font-smoothing:antialiased;min-height:100vh}
-.wrap{max-width:720px;margin:0 auto;padding:64px 20px 90px}
+.wrap{max-width:720px;margin:0 auto;padding:64px 20px 90px;position:relative}
+.theme-btn{position:absolute;top:56px;right:20px;width:40px;height:40px;border-radius:11px;
+  border:1px solid var(--border);background:var(--card);color:var(--dim);cursor:pointer;
+  font-size:18px;display:flex;align-items:center;justify-content:center;transition:.16s}
+.theme-btn:hover{color:var(--text);border-color:var(--accent);transform:translateY(-1px)}
 .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;
   text-transform:uppercase;color:var(--accent);margin-bottom:10px}
 h1{font-size:clamp(26px,5vw,36px);font-weight:700;letter-spacing:-.02em;margin-bottom:12px}
@@ -420,15 +437,33 @@ def render_root_index(level_summaries):
         '<html lang="uk">\n<head>\n<meta charset="UTF-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
         "<title>KE Training</title>\n" + pwa_assets.HEAD_TAGS +
+        ROOT_THEME_APPLY_SCRIPT +
         "<style>" + ROOT_INDEX_CSS + "</style>\n"
         "</head>\n<body>\n"
         '<div class="wrap">\n'
+        '  <button class="theme-btn" id="themeBtn" title="Світла / темна тема">◐</button>\n'
         '  <div class="eyebrow">InterCode · Competency Matrix</div>\n'
         "  <h1>KE Training</h1>\n"
         '  <div class="sub">Оберіть рівень підготовки.</div>\n'
         '  <div class="levels">\n    ' + "\n    ".join(items) + "\n  </div>\n"
-        '  <div class="footer">згенеровано з навчальних .md</div>\n'
-        "</div>\n" + pwa_assets.SW_REGISTER_SCRIPT +
+        '  <div class="footer">згенеровано з навчальних .md'
+        ' · <a href="/cdn-cgi/access/logout" style="color:var(--mute)">вийти з акаунта</a></div>\n'
+        "</div>\n"
+        # Перемикач теми: поточна = явний data-theme або системна перевага.
+        # Вибір зберігається у спільному study_theme_v1 (той самий, що на рівнях).
+        "<script>\n"
+        "(function(){\n"
+        "var btn=document.getElementById('themeBtn');\n"
+        "function cur(){return document.documentElement.getAttribute('data-theme')||\n"
+        "  (matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');}\n"
+        "function label(){btn.textContent=cur()==='dark'?'\\u2600':'\\u263e';}\n"
+        "label();\n"
+        "btn.onclick=function(){var t=cur()==='dark'?'light':'dark';\n"
+        "  document.documentElement.setAttribute('data-theme',t);\n"
+        "  try{localStorage.setItem('study_theme_v1',t)}catch(e){}\n"
+        "  label();};\n"
+        "})();\n"
+        "</script>\n" + pwa_assets.SW_REGISTER_SCRIPT +
         "</body>\n</html>\n"
     )
 
@@ -445,7 +480,8 @@ def render_404_page():
         "<!DOCTYPE html>\n"
         '<html lang="uk">\n<head>\n<meta charset="UTF-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
-        "<title>404 · KE Training</title>\n<style>" + ROOT_INDEX_CSS + "</style>\n"
+        "<title>404 · KE Training</title>\n" + ROOT_THEME_APPLY_SCRIPT +
+        "<style>" + ROOT_INDEX_CSS + "</style>\n"
         "</head>\n<body>\n"
         '<div class="wrap">\n'
         '  <div class="eyebrow">InterCode · Competency Matrix</div>\n'

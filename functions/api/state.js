@@ -30,9 +30,17 @@ export async function onRequestGet({ request, env }) {
   const ctx = authorize(request, env);
   if (ctx.error) return ctx.error;
   const stored = await env.STUDY_STATE.get(ctx.key);
+  // X-Study-User — для owner guard на клієнті: браузер дізнається, чий це
+  // прогрес, і скидає локальний стан при зміні акаунта на спільному пристрої.
+  // encodeURIComponent — значення HTTP-заголовків мають бути ASCII.
+  const email = request.headers.get("Cf-Access-Authenticated-User-Email");
   return new Response(stored || "{}", {
     status: 200,
-    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+      "X-Study-User": encodeURIComponent(email),
+    },
   });
 }
 

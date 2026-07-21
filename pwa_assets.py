@@ -515,7 +515,10 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
 
   // /api/* — повний bypass: синк прогресу цей SW не перехоплює взагалі.
-  if (new URL(request.url).pathname.startsWith('/api/')) return;
+  // /cdn-cgi/* — інфраструктура Cloudflare (logout Access тощо): теж bypass,
+  // інакше офлайн-фолбек підмінив би сторінку виходу кешованим застосунком.
+  const pathname = new URL(request.url).pathname;
+  if (pathname.startsWith('/api/') || pathname.startsWith('/cdn-cgi/')) return;
 
   // лише GET, лише той самий origin — решту лишаємо браузеру як є.
   if (request.method !== 'GET' || !isSameOrigin(request.url)) return;

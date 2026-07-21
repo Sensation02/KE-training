@@ -42,11 +42,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 
 .topbar{display:flex;align-items:center;flex-wrap:wrap;gap:12px 16px;padding:22px 0 18px;
   position:sticky;top:0;z-index:20;background:var(--bg)}
-.brand{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.brand{display:flex;flex-direction:column;gap:2px;flex:0 1 auto;min-width:0}
 .brand .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;
   text-transform:uppercase;color:var(--accent)}
 .brand h1{font-size:clamp(19px,3.4vw,25px);font-weight:700;letter-spacing:-.02em;line-height:1.1}
-.overall{display:flex;align-items:center;gap:11px;flex:none}
+/* авто-відступи з обох боків центрують прогрес між брендом ліворуч і діями праворуч */
+.overall{display:flex;align-items:center;gap:11px;flex:none;margin-inline:auto}
+.topbar-actions{display:flex;gap:12px;flex:none}
 .ring{--p:0;position:relative;width:46px;height:46px;border-radius:50%;flex:none;
   background:conic-gradient(var(--accent) calc(var(--p)*1%),var(--border) 0);transition:background .5s}
 .ring::after{content:"";position:absolute;inset:5px;background:var(--bg);border-radius:50%}
@@ -244,7 +246,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
   .brand{flex:1 1 100%;order:1}
   .nav-back{order:2}
   .overall{order:3}
-  .icon-btn{order:4;margin-left:auto}
+  .topbar-actions{order:4;gap:10px}
   .tab{font-size:13px;padding:10px 5px}
   .tab .cnt{display:none}
   .card{padding:16px 13px;min-height:300px}
@@ -271,7 +273,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
       <div class="ring" id="ring"><b id="ringPct">0%</b></div>
       <div class="otext"><b id="knownN">0</b>&nbsp;/&nbsp;<span id="totalN">0</span><br>вивчено</div>
     </div>
-    <button class="icon-btn" id="themeBtn" title="Світла / темна тема">◐</button>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="themeBtn" title="Світла / темна тема">◐</button>
+      <button class="icon-btn" id="logoutBtn" title="Вийти з акаунта" aria-label="Вийти з акаунта">⎋</button>
+    </div>
   </div>
 
   <div class="tabs">
@@ -336,6 +341,17 @@ window.__LEVEL__ = LEVEL_KEY_PLACEHOLDER;
 const DATA = window.__DATA__;
 // ключ localStorage містить рівень — прогрес різних рівнів на одному origin не перетирається
 const LS_KEY = window.__LEVEL__ + '_study_v1';
+const OWNER_KEY = 'study_owner_v1';
+// Тема спільна для всіх сторінок origin (коренева + рівні). Навмисно НЕ
+// підпадає під clearLocalProgress: це косметика пристрою, а не прогрес.
+const THEME_KEY = 'study_theme_v1';
+// Прибирає прогрес УСІХ рівнів: localStorage спільний на origin, тож зміна
+// акаунта стосується l2/l3/... одразу, а не лише відкритого рівня.
+function clearLocalProgress(){
+  Object.keys(localStorage)
+    .filter(k => k.endsWith('_study_v1') || k.endsWith('_study_v1_synced'))
+    .forEach(k => localStorage.removeItem(k));
+}
 
 const DEPTH_LABEL = {deep:'Добре знати', mid:'Знати', aware:'Поверхнево'};
 const DEPTH_ORDER = ['deep','mid','aware'];
@@ -344,10 +360,15 @@ const CAT_COLOR = {'front-end':'#f59e0b','back-end':'#ec4899','databases':'#14b8
 
 /* ---------- Стан / localStorage ---------- */
 function load(){
+  let st;
   try{
-    return Object.assign({theme:'dark',tab:'reader',q:{},chk:{},updatedAt:0},
+    st = Object.assign({theme:'dark',tab:'reader',q:{},chk:{},updatedAt:0},
       JSON.parse(localStorage.getItem(LS_KEY)||'{}'));
-  }catch(e){ return {theme:'dark',tab:'reader',q:{},chk:{},updatedAt:0}; }
+  }catch(e){ st = {theme:'dark',tab:'reader',q:{},chk:{},updatedAt:0}; }
+  // спільний ключ має пріоритет; st.theme лишається фолбеком для міграції
+  // зі старих збережених станів (до появи THEME_KEY)
+  st.theme = localStorage.getItem(THEME_KEY) || st.theme;
+  return st;
 }
 let state = load();
 // save() — для косметичних полів (тема/вкладка/згорнуті категорії): лише локально,
@@ -459,6 +480,19 @@ async function syncOnLoad(){
   if(res.status===503){ setBadge('offline'); syncArmed = true; return; } // KV не піднято — тихий локальний режим
   if(res.status>=500){ setBadge('error'); syncArmed = true; return; }
   if(!res.ok){ setBadge('error'); syncArmed = true; return; }
+
+  // Owner guard: якщо локальний стан належить іншому користувачу (акаунт на
+  // цьому пристрої змінився — кнопкою виходу чи після протермінування сесії),
+  // скидаємо чужий прогрес ДО union/LWW — інакше він злився б у серверний
+  // стан нового користувача або перезаписав його.
+  const owner = decodeURIComponent(res.headers.get('X-Study-User') || '');
+  const prevOwner = localStorage.getItem(OWNER_KEY);
+  if(owner && prevOwner && owner !== prevOwner){
+    clearLocalProgress(); // знімає і прапорець _synced → нижче спрацює гілка "перший синк"
+    state = {theme:state.theme, tab:'reader', q:{}, chk:{}, updatedAt:0}; // тема — косметика пристрою, лишається
+    renderReader(); renderCheck(); refreshProgress(); rebuildDeck();
+  }
+  if(owner) localStorage.setItem(OWNER_KEY, owner);
 
   let remote = {};
   try{ remote = await res.json(); }catch(e){ /* лишаємо {} */ }
@@ -1005,6 +1039,7 @@ function switchTab(name){
 }
 function applyTheme(){
   document.documentElement.setAttribute('data-theme', state.theme);
+  localStorage.setItem(THEME_KEY, state.theme);
   $('#themeBtn').textContent = state.theme==='dark' ? '☀' : '☾';
 }
 
@@ -1033,6 +1068,18 @@ function init(){
   $('#hideKnown').onchange = e=>{ filter.hideKnown = e.target.checked; renderReader(); };
   document.querySelectorAll('.tab').forEach(t=>t.onclick = ()=>switchTab(t.dataset.tab));
   $('#themeBtn').onclick = ()=>{ state.theme = state.theme==='dark'?'light':'dark'; applyTheme(); save(); };
+  $('#logoutBtn').onclick = async ()=>{
+    // Дотиснути незбережені зміни перед виходом; якщо не вдалося
+    // (офлайн / сесія вже мертва) — вирішує людина.
+    let pushed = true;
+    if(syncArmed){ clearTimeout(syncTimer); pushed = await pushNow(); }
+    if(!pushed && !confirm('Останні зміни не збережено на сервері. Вийти все одно?')) return;
+    clearLocalProgress();
+    localStorage.removeItem(OWNER_KEY);
+    // Вбудований logout Cloudflare Access: стирає кукі сесії,
+    // наступний візит показує форму входу.
+    location.href = '/cdn-cgi/access/logout';
+  };
   $('#resetBtn').onclick = e=>{
     e.preventDefault();
     if(confirm('Скинути весь прогрес (статуси питань і чеклист)?')){
