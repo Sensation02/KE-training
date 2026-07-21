@@ -336,6 +336,14 @@ window.__LEVEL__ = LEVEL_KEY_PLACEHOLDER;
 const DATA = window.__DATA__;
 // ключ localStorage містить рівень — прогрес різних рівнів на одному origin не перетирається
 const LS_KEY = window.__LEVEL__ + '_study_v1';
+const OWNER_KEY = 'study_owner_v1';
+// Прибирає прогрес УСІХ рівнів: localStorage спільний на origin, тож зміна
+// акаунта стосується l2/l3/... одразу, а не лише відкритого рівня.
+function clearLocalProgress(){
+  Object.keys(localStorage)
+    .filter(k => k.endsWith('_study_v1') || k.endsWith('_study_v1_synced'))
+    .forEach(k => localStorage.removeItem(k));
+}
 
 const DEPTH_LABEL = {deep:'Добре знати', mid:'Знати', aware:'Поверхнево'};
 const DEPTH_ORDER = ['deep','mid','aware'];
@@ -459,6 +467,19 @@ async function syncOnLoad(){
   if(res.status===503){ setBadge('offline'); syncArmed = true; return; } // KV не піднято — тихий локальний режим
   if(res.status>=500){ setBadge('error'); syncArmed = true; return; }
   if(!res.ok){ setBadge('error'); syncArmed = true; return; }
+
+  // Owner guard: якщо локальний стан належить іншому користувачу (акаунт на
+  // цьому пристрої змінився — кнопкою виходу чи після протермінування сесії),
+  // скидаємо чужий прогрес ДО union/LWW — інакше він злився б у серверний
+  // стан нового користувача або перезаписав його.
+  const owner = decodeURIComponent(res.headers.get('X-Study-User') || '');
+  const prevOwner = localStorage.getItem(OWNER_KEY);
+  if(owner && prevOwner && owner !== prevOwner){
+    clearLocalProgress(); // знімає і прапорець _synced → нижче спрацює гілка "перший синк"
+    state = {theme:state.theme, tab:'reader', q:{}, chk:{}, updatedAt:0}; // тема — косметика пристрою, лишається
+    renderReader(); renderCheck(); refreshProgress(); rebuildDeck();
+  }
+  if(owner) localStorage.setItem(OWNER_KEY, owner);
 
   let remote = {};
   try{ remote = await res.json(); }catch(e){ /* лишаємо {} */ }
