@@ -427,7 +427,8 @@ def render_root_index(level_summaries):
         "  <h1>KE Training</h1>\n"
         '  <div class="sub">Оберіть рівень підготовки.</div>\n'
         '  <div class="levels">\n    ' + "\n    ".join(items) + "\n  </div>\n"
-        '  <div class="footer">згенеровано з навчальних .md</div>\n'
+        '  <div class="footer">згенеровано з навчальних .md'
+        ' · <a href="/cdn-cgi/access/logout" style="color:var(--mute)">вийти з акаунта</a></div>\n'
         "</div>\n" + pwa_assets.SW_REGISTER_SCRIPT +
         "</body>\n</html>\n"
     )
