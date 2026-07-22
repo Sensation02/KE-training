@@ -112,8 +112,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .icon-btn svg{width:18px;height:18px;display:block}
 .nav-back svg{width:20px;height:20px;display:block}
 .tab-ic{display:inline-flex} .tab-ic svg{width:16px;height:16px;display:block}
-.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+/* line-height:1 стискає line-box до розміру гліфів, щоб іконка/kbd/крапка
+   збігалися з ОПТИЧНИМ центром тексту, а не з центром високого line-box */
+button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;line-height:1}
 .mini-btn svg,.btn svg{width:15px;height:15px;display:block;flex:none}
+.tab,.chip,.pill.depth{line-height:1}
+.pill.depth .dbadge{margin-top:0} /* скидаємо зсув, потрібний лише в .q-head */
 .exam-label svg{width:14px;height:14px;display:block;flex:none}
 .empty .big svg{width:42px;height:42px;stroke-width:1.5;color:var(--mute);display:inline-block}
 /* поле пошуку з іконкою-лупою */
@@ -173,7 +177,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
   border-radius:12px;padding:11px 13px;margin-bottom:11px}
 .exam-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
   text-transform:uppercase;color:var(--accent);margin-bottom:7px;font-weight:600;
-  display:flex;align-items:center;gap:6px}
+  display:flex;align-items:center;gap:6px;line-height:1}
 .full-toggle{text-align:center;padding-top:14px}
 
 /* ============ Флеш-картки ============ */
@@ -259,6 +263,14 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .t-c{color:#5f6b7d;font-style:italic} .t-s{color:#7ee787} .t-k{color:#ff9ecb}
 
 .footer{text-align:center;margin-top:34px;font-size:11.5px;color:var(--mute);font-family:var(--mono)}
+
+/* планшет і вужче — більші контроли Флеш-карток (зручніший тап) */
+@media (max-width:900px){
+  .deck-controls{gap:10px}
+  .deck-controls .mini-btn,.deck-controls select.mini-btn,.deck-controls .chip-toggle{
+    font-size:14px;padding:12px 16px;border-radius:11px}
+  .deck-controls .mini-btn svg,.deck-controls .chip-toggle .chip-ic svg{width:16px;height:16px}
+}
 
 @media (max-width:560px){
   .app{padding:0 7px calc(70px + env(safe-area-inset-bottom))}
