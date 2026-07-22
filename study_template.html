@@ -1066,11 +1066,10 @@ function renderCard(){
       '</div>'+
       '<div class="card-q"><span style="font-family:var(--mono);font-size:.7em;color:var(--mute)">'+q.id+'&nbsp;&nbsp;</span>'+esc(q.title)+'</div>'+
       (revealed
-        ? '<div class="card-a md">'+examHtml(key,q)+
-            (fullShown
-              ? md(key,q.md)
-              : '<div class="full-toggle"><button class="mini-btn" id="fullBtn">'+ICONS['book-open']+' Повний розбір</button></div>')+
-          '</div>'
+        // текст відповіді скролиться в межах .card-a; кнопку «Повний розбір»
+        // виносимо ПОЗА скрол-зону, щоб вона не ховалась під нижнім краєм
+        ? '<div class="card-a md">'+examHtml(key,q)+(fullShown?md(key,q.md):'')+'</div>'+
+          (fullShown?'':'<div class="full-toggle"><button class="mini-btn" id="fullBtn">'+ICONS['book-open']+' Повний розбір</button></div>')
         : '<div class="reveal-hint">Спробуй відповісти вголос, тоді звір з еталоном ↓</div>')+
       (revealed
         ? '<div class="deck-actions">'+
