@@ -109,7 +109,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .toggle input{accent-color:var(--accent);width:15px;height:15px}
 
 /* ============ Читалка ============ */
-.cat{margin-bottom:14px;border:1px solid var(--border);border-radius:var(--radius);
+.cat{margin-bottom:10px;border:1px solid var(--border);border-radius:var(--radius);
   background:var(--card);box-shadow:var(--shadow)}
 .cat-head{display:flex;align-items:center;gap:13px;padding:15px 17px;cursor:pointer;user-select:none}
 .cat-bar{width:4px;align-self:stretch;border-radius:3px;flex:none}
@@ -124,7 +124,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 
 .q{border-top:1px solid var(--border-soft)}
 .q:first-child{border-top:none}
-.q-head{display:flex;align-items:flex-start;gap:12px;padding:13px 17px;cursor:pointer}
+.q-head{display:flex;align-items:flex-start;gap:12px;padding:10px 17px;cursor:pointer}
 .q-head:hover{background:var(--card-hi)}
 .dbadge{flex:none;margin-top:3px;width:9px;height:9px;border-radius:50%}
 .dbadge.deep{background:var(--deep)} .dbadge.mid{background:var(--mid)} .dbadge.aware{background:var(--aware)}
@@ -136,7 +136,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .status:hover{border-color:var(--accent)}
 .status.learning{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
 .status.known{color:var(--good);border-color:var(--good);background:var(--good-soft)}
-.answer{display:none;padding:2px 17px 20px 38px;font-size:14.5px}
+.copy-btn{flex:none;margin-top:1px;display:flex;align-items:center;justify-content:center;
+  border:1px solid transparent;background:none;cursor:pointer;padding:5px;border-radius:8px;
+  color:var(--mute);opacity:.6;transition:.14s}
+.copy-btn svg{display:block;width:15px;height:15px}
+.copy-btn:hover{opacity:1;background:var(--panel);border-color:var(--border)}
+.copy-btn.copied{opacity:1;color:var(--good);border-color:var(--good);background:var(--good-soft)}
+.answer{display:none;padding:2px 17px 16px 17px;font-size:14.5px}
 .q.open .answer{display:block;animation:fade .2s}
 .q.open .q-head{background:var(--card-hi);position:sticky;top:var(--stick-top,86px);z-index:5}
 
@@ -145,7 +151,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 
 /* ============ Блок «🎯 Відповідь на іспиті» ============ */
 .exam{border:1px solid var(--accent);background:var(--accent-soft);
-  border-radius:12px;padding:12px 14px;margin-bottom:14px}
+  border-radius:12px;padding:11px 13px;margin-bottom:11px}
 .exam-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
   text-transform:uppercase;color:var(--accent);margin-bottom:7px;font-weight:600}
 .full-toggle{text-align:center;padding-top:14px}
@@ -207,7 +213,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .chk-item.done .chk-refs .qref{text-decoration:none}
 
 /* ============ Рендер Markdown ============ */
-.md>*{margin-bottom:11px} .md>*:last-child{margin-bottom:0}
+.md>*{margin-bottom:9px} .md>*:last-child{margin-bottom:0}
 .md p{color:var(--text)}
 .md strong{font-weight:700} .md em{font-style:italic}
 .md a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-soft)}
@@ -718,6 +724,39 @@ function examHtml(key, q){
     md(key+'#exam', q.exam)+'</div>';
 }
 
+// Векторні іконки кнопки копіювання (inline SVG, currentColor — успадковує
+// колір кнопки: приглушений → зелений у стані .copied). Без емодзі, щоб
+// вигляд не залежав від шрифту ОС.
+const ICON_COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>';
+
+// Текст питання для копіювання: заголовок + еталонна відповідь (q.exam),
+// fenced-блоки коду (```…```) — те, що renderMarkdown() рендерить як
+// блок коду, — замінюємо плейсхолдером; інлайн-`код` лишаємо (короткі
+// ідентифікатори, не лістинги). Ціль — вставити ментору або в чат LLM.
+function stripCodeBlocks(text){
+  return (text || '').replace(/```[\s\S]*?```/g, '[код пропущено]')
+    .replace(/\n{3,}/g, '\n\n').trim();
+}
+function copyQuestionText(q, btn){
+  const txt = 'Питання: ' + q.title.trim() + '\n\n' + stripCodeBlocks(q.exam);
+  const done = ()=>{
+    btn.innerHTML = ICON_CHECK; btn.classList.add('copied');
+    setTimeout(()=>{ btn.innerHTML = ICON_COPY; btn.classList.remove('copied'); }, 1200);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done).catch(()=>fallbackCopy(txt, done));
+  } else {
+    fallbackCopy(txt, done);
+  }
+}
+function fallbackCopy(txt, done){
+  const ta = document.createElement('textarea');
+  ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); done(); } finally { ta.remove(); }
+}
+
 /* ============================================================
    ЗАГАЛЬНИЙ ПРОГРЕС
    ============================================================ */
@@ -817,14 +856,17 @@ function renderReader(){
         '<div class="q-head">'+
           '<span class="dbadge '+q.depth+'" title="'+DEPTH_LABEL[q.depth]+'"></span>'+
           '<span class="q-title"><span class="id">'+q.id+'</span>'+esc(q.title)+'</span>'+
+          '<button class="copy-btn" type="button" title="Скопіювати текст питання (без коду)" aria-label="Скопіювати текст питання">'+ICON_COPY+'</button>'+
           '<button class="status '+(st!=='new'?st:'')+'">'+STATUS_TXT[st]+'</button>'+
         '</div>'+
         '<div class="answer md"></div>';
       const head = qEl.querySelector('.q-head');
       const ans = qEl.querySelector('.answer');
       const stBtn = qEl.querySelector('.status');
+      const copyBtn = qEl.querySelector('.copy-btn');
+      copyBtn.onclick = (e)=>{ e.stopPropagation(); copyQuestionText(q, copyBtn); };
       head.onclick = (e)=>{
-        if(e.target === stBtn) return;
+        if(e.target === stBtn || e.target === copyBtn) return;
         if(!ans.innerHTML) ans.innerHTML = examHtml(k, q) + md(k, q.md);
         const willClose = qEl.classList.contains('open');
         qEl.classList.toggle('open');
