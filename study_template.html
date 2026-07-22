@@ -38,7 +38,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 ::selection{background:var(--accent-soft)}
 
 /* ============ Каркас ============ */
-.app{max-width:1000px;margin:0 auto;padding:0 18px calc(90px + env(safe-area-inset-bottom))}
+.app{max-width:1000px;margin:0 auto;padding:0 18px calc(44px + env(safe-area-inset-bottom))}
 
 .topbar{display:flex;align-items:center;flex-wrap:wrap;gap:12px 16px;padding:22px 0 18px;
   position:sticky;top:0;z-index:20;background:var(--bg)}
@@ -187,7 +187,7 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 .deck-bar .prog{flex:1;min-width:120px;height:6px;background:var(--border);border-radius:20px;overflow:hidden}
 .deck-bar .prog i{display:block;height:100%;background:var(--accent);border-radius:20px;transition:width .3s}
 .card{width:100%;min-height:340px;background:var(--card);border:1px solid var(--border);
-  border-radius:20px;box-shadow:var(--shadow);padding:26px 26px 22px;display:flex;flex-direction:column}
+  border-radius:20px;box-shadow:var(--shadow);padding:26px 26px 14px;display:flex;flex-direction:column}
 .card-top{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
 .pill{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
   padding:4px 9px;border-radius:20px;border:1px solid var(--border);color:var(--dim)}
@@ -198,7 +198,7 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 /* єдиний скрол — сторінки; кнопки Знаю/Повторити липнуть до низу екрана,
    поки картка не доскролена, тож не губляться на довгому «Повному розборі» */
 .deck-actions{display:flex;gap:12px;width:100%;margin-top:auto;
-  position:sticky;bottom:0;background:var(--card);padding-top:16px;
+  position:sticky;bottom:0;background:var(--card);padding:16px 0 14px;
   box-shadow:0 -14px 18px -6px var(--card)}
 .btn{flex:1;padding:14px;border-radius:13px;border:1px solid var(--border);background:var(--panel);
   color:var(--text);font-family:var(--font);font-size:14.5px;font-weight:600;cursor:pointer;transition:.14s;
@@ -265,7 +265,7 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 /* підсвітка синтаксису */
 .t-c{color:#5f6b7d;font-style:italic} .t-s{color:#7ee787} .t-k{color:#ff9ecb}
 
-.footer{text-align:center;margin-top:34px;font-size:11.5px;color:var(--mute);font-family:var(--mono)}
+.footer{text-align:center;margin-top:22px;font-size:11.5px;color:var(--mute);font-family:var(--mono)}
 
 /* планшет і вужче — більші контроли Флеш-карток (зручніший тап) */
 @media (max-width:900px){
