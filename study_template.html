@@ -38,7 +38,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 ::selection{background:var(--accent-soft)}
 
 /* ============ Каркас ============ */
-.app{max-width:1000px;margin:0 auto;padding:0 18px calc(90px + env(safe-area-inset-bottom))}
+.app{max-width:1000px;margin:0 auto;padding:0 18px calc(44px + env(safe-area-inset-bottom))}
 
 .topbar{display:flex;align-items:center;flex-wrap:wrap;gap:12px 16px;padding:22px 0 18px;
   position:sticky;top:0;z-index:20;background:var(--bg)}
@@ -108,8 +108,31 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
   gap:7px;cursor:pointer;user-select:none}
 .toggle input{accent-color:var(--accent);width:15px;height:15px}
 
+/* ============ Векторні іконки: розміри під контекст ============ */
+.icon-btn svg{width:18px;height:18px;display:block}
+.nav-back svg{width:20px;height:20px;display:block}
+.tab-ic{display:inline-flex} .tab-ic svg{width:16px;height:16px;display:block}
+/* line-height:1 стискає line-box до розміру гліфів, щоб іконка/kbd/крапка
+   збігалися з ОПТИЧНИМ центром тексту, а не з центром високого line-box */
+button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;line-height:1}
+.mini-btn svg,.btn svg{width:15px;height:15px;display:block;flex:none}
+.tab,.chip,.pill.depth{line-height:1}
+.pill.depth .dbadge{margin-top:0} /* скидаємо зсув, потрібний лише в .q-head */
+.exam-label svg{width:14px;height:14px;display:block;flex:none}
+.empty .big svg{width:42px;height:42px;stroke-width:1.5;color:var(--mute);display:inline-block}
+/* поле пошуку з іконкою-лупою */
+.search-wrap{position:relative}
+.search-ic{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--mute);
+  display:flex;pointer-events:none}
+.search-ic svg{width:16px;height:16px;display:block}
+.search-wrap .search{padding-left:42px}
+/* чип-перемикач «приховати вивчені» — у стилі .chip, активний залито акцентом */
+.chip-toggle{margin-left:auto;font-family:var(--font)}
+.chip-toggle .chip-ic{display:inline-flex} .chip-toggle .chip-ic svg{width:14px;height:14px;display:block}
+.chip-toggle.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
 /* ============ Читалка ============ */
-.cat{margin-bottom:14px;border:1px solid var(--border);border-radius:var(--radius);
+.cat{margin-bottom:10px;border:1px solid var(--border);border-radius:var(--radius);
   background:var(--card);box-shadow:var(--shadow)}
 .cat-head{display:flex;align-items:center;gap:13px;padding:15px 17px;cursor:pointer;user-select:none}
 .cat-bar{width:4px;align-self:stretch;border-radius:3px;flex:none}
@@ -124,7 +147,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 
 .q{border-top:1px solid var(--border-soft)}
 .q:first-child{border-top:none}
-.q-head{display:flex;align-items:flex-start;gap:12px;padding:13px 17px;cursor:pointer}
+.q-head{display:flex;align-items:flex-start;gap:12px;padding:10px 17px;cursor:pointer}
 .q-head:hover{background:var(--card-hi)}
 .dbadge{flex:none;margin-top:3px;width:9px;height:9px;border-radius:50%}
 .dbadge.deep{background:var(--deep)} .dbadge.mid{background:var(--mid)} .dbadge.aware{background:var(--aware)}
@@ -136,7 +159,13 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .status:hover{border-color:var(--accent)}
 .status.learning{color:var(--warn);border-color:var(--warn);background:var(--warn-soft)}
 .status.known{color:var(--good);border-color:var(--good);background:var(--good-soft)}
-.answer{display:none;padding:2px 17px 20px 38px;font-size:14.5px}
+.copy-btn{flex:none;margin-top:1px;display:flex;align-items:center;justify-content:center;
+  border:1px solid transparent;background:none;cursor:pointer;padding:5px;border-radius:8px;
+  color:var(--mute);opacity:.6;transition:.14s}
+.copy-btn svg{display:block;width:15px;height:15px}
+.copy-btn:hover{opacity:1;background:var(--panel);border-color:var(--border)}
+.copy-btn.copied{opacity:1;color:var(--good);border-color:var(--good);background:var(--good-soft)}
+.answer{display:none;padding:2px 17px 16px 17px;font-size:14.5px}
 .q.open .answer{display:block;animation:fade .2s}
 .q.open .q-head{background:var(--card-hi);position:sticky;top:var(--stick-top,86px);z-index:5}
 
@@ -145,9 +174,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 
 /* ============ Блок «🎯 Відповідь на іспиті» ============ */
 .exam{border:1px solid var(--accent);background:var(--accent-soft);
-  border-radius:12px;padding:12px 14px;margin-bottom:14px}
+  border-radius:12px;padding:11px 13px;margin-bottom:11px}
 .exam-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
-  text-transform:uppercase;color:var(--accent);margin-bottom:7px;font-weight:600}
+  text-transform:uppercase;color:var(--accent);margin-bottom:7px;font-weight:600;
+  display:flex;align-items:center;gap:6px;line-height:1}
 .full-toggle{text-align:center;padding-top:14px}
 
 /* ============ Флеш-картки ============ */
@@ -157,16 +187,19 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .deck-bar .prog{flex:1;min-width:120px;height:6px;background:var(--border);border-radius:20px;overflow:hidden}
 .deck-bar .prog i{display:block;height:100%;background:var(--accent);border-radius:20px;transition:width .3s}
 .card{width:100%;min-height:340px;background:var(--card);border:1px solid var(--border);
-  border-radius:20px;box-shadow:var(--shadow);padding:26px 26px 22px;display:flex;flex-direction:column}
+  border-radius:20px;box-shadow:var(--shadow);padding:26px 26px 14px;display:flex;flex-direction:column}
 .card-top{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
 .pill{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
   padding:4px 9px;border-radius:20px;border:1px solid var(--border);color:var(--dim)}
 .pill.depth{display:inline-flex;align-items:center;gap:6px}
 .card-q{font-size:20px;font-weight:700;letter-spacing:-.01em;line-height:1.3}
-.card-a{margin-top:18px;padding-top:18px;border-top:1px dashed var(--border);
-  font-size:14.5px;flex:1;overflow-y:auto;max-height:46vh}
+.card-a{margin-top:18px;padding-top:18px;border-top:1px dashed var(--border);font-size:14.5px}
 .reveal-hint{margin-top:auto;padding-top:22px;text-align:center;color:var(--mute);font-size:13px}
-.deck-actions{display:flex;gap:12px;width:100%;margin-top:20px}
+/* єдиний скрол — сторінки; кнопки Знаю/Повторити липнуть до низу екрана,
+   поки картка не доскролена, тож не губляться на довгому «Повному розборі» */
+.deck-actions{display:flex;gap:12px;width:100%;margin-top:auto;
+  position:sticky;bottom:0;background:var(--card);padding:16px 0 14px;
+  box-shadow:0 -14px 18px -6px var(--card)}
 .btn{flex:1;padding:14px;border-radius:13px;border:1px solid var(--border);background:var(--panel);
   color:var(--text);font-family:var(--font);font-size:14.5px;font-weight:600;cursor:pointer;transition:.14s;
   display:flex;align-items:center;justify-content:center;gap:9px}
@@ -207,7 +240,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .chk-item.done .chk-refs .qref{text-decoration:none}
 
 /* ============ Рендер Markdown ============ */
-.md>*{margin-bottom:11px} .md>*:last-child{margin-bottom:0}
+.md>*{margin-bottom:9px} .md>*:last-child{margin-bottom:0}
 .md p{color:var(--text)}
 .md strong{font-weight:700} .md em{font-style:italic}
 .md a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-soft)}
@@ -232,7 +265,15 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 /* підсвітка синтаксису */
 .t-c{color:#5f6b7d;font-style:italic} .t-s{color:#7ee787} .t-k{color:#ff9ecb}
 
-.footer{text-align:center;margin-top:34px;font-size:11.5px;color:var(--mute);font-family:var(--mono)}
+.footer{text-align:center;margin-top:22px;font-size:11.5px;color:var(--mute);font-family:var(--mono)}
+
+/* планшет і вужче — більші контроли Флеш-карток (зручніший тап) */
+@media (max-width:900px){
+  .deck-controls{gap:10px}
+  .deck-controls .mini-btn,.deck-controls select.mini-btn,.deck-controls .chip-toggle{
+    font-size:14px;padding:12px 16px;border-radius:11px}
+  .deck-controls .mini-btn svg,.deck-controls .chip-toggle .chip-ic svg{width:16px;height:16px}
+}
 
 @media (max-width:560px){
   .app{padding:0 7px calc(70px + env(safe-area-inset-bottom))}
@@ -267,7 +308,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 <body>
 <div class="app">
   <div class="topbar">
-    <a class="nav-back" href="/" title="До вибору рівня" aria-label="До вибору рівня">←</a>
+    <a class="nav-back" href="/" title="До вибору рівня" aria-label="До вибору рівня" data-icon="arrow-left"></a>
     <div class="brand">
       <div class="eyebrow">InterCode · Competency Matrix</div>
       <h1>L3 Full-stack</h1>
@@ -277,25 +318,28 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
       <div class="otext"><b id="knownN">0</b>&nbsp;/&nbsp;<span id="totalN">0</span><br>вивчено</div>
     </div>
     <div class="topbar-actions">
-      <button class="icon-btn" id="themeBtn" title="Світла / темна тема">◐</button>
-      <button class="icon-btn" id="logoutBtn" title="Вийти з акаунта" aria-label="Вийти з акаунта">⎋</button>
+      <button class="icon-btn" id="themeBtn" title="Світла / темна тема" aria-label="Перемкнути тему"></button>
+      <button class="icon-btn" id="logoutBtn" title="Вийти з акаунта" aria-label="Вийти з акаунта" data-icon="log-out"></button>
     </div>
   </div>
 
   <div class="tabs">
-    <button class="tab active" data-tab="reader">📖 Читалка <span class="cnt" id="cntReader">0</span></button>
-    <button class="tab" data-tab="cards">🎴 Флеш-картки <span class="cnt" id="cntCards">0</span></button>
-    <button class="tab" data-tab="check">✅ Чеклист <span class="cnt" id="cntCheck">0</span></button>
+    <button class="tab active" data-tab="reader"><span class="tab-ic" data-icon="book-open"></span><span class="tab-txt">Читалка</span> <span class="cnt" id="cntReader">0</span></button>
+    <button class="tab" data-tab="cards"><span class="tab-ic" data-icon="layers"></span><span class="tab-txt">Флеш-картки</span> <span class="cnt" id="cntCards">0</span></button>
+    <button class="tab" data-tab="check"><span class="tab-ic" data-icon="check-square"></span><span class="tab-txt">Чеклист</span> <span class="cnt" id="cntCheck">0</span></button>
   </div>
 
   <!-- ЧИТАЛКА -->
   <section class="view active" id="view-reader">
     <div class="filters">
-      <input class="search" id="search" type="search" placeholder="🔍 Пошук по питаннях і відповідях…" autocomplete="off">
+      <div class="search-wrap">
+        <span class="search-ic" data-icon="search"></span>
+        <input class="search" id="search" type="search" placeholder="Пошук по питаннях і відповідях…" autocomplete="off">
+      </div>
       <div class="chips" id="catChips"></div>
       <div class="chips">
         <div class="chips" id="depthChips"></div>
-        <label class="toggle"><input type="checkbox" id="hideKnown"> приховати вивчені</label>
+        <button class="chip chip-toggle" id="hideKnown" type="button" aria-pressed="false"><span class="chip-ic" data-icon="eye-off"></span> Приховати вивчені</button>
       </div>
     </div>
     <div id="readerList"></div>
@@ -553,7 +597,7 @@ function openQuestion(key){
   filter = {cats:new Set(DATA.categories.map(c=>c.key)), depths:new Set(DEPTH_ORDER),
     search:'', hideKnown:false};
   $('#search').value = '';
-  $('#hideKnown').checked = false;
+  syncHideKnownChip();
   buildChips();
   state['open_'+hit.cat.key] = true; save();
   renderReader();
@@ -714,8 +758,70 @@ function md(k, text){ return mdCache[k] || (mdCache[k] = renderMarkdown(text)); 
 // збірка гарантує його наявність). Ключ кеша '#exam' не перетинається
 // з ключами повних відповідей (там 'section:QN').
 function examHtml(key, q){
-  return '<div class="exam"><div class="exam-label">🎯 Відповідь на іспиті</div>'+
+  return '<div class="exam"><div class="exam-label">'+ICONS.target+' Відповідь на іспиті</div>'+
     md(key+'#exam', q.exam)+'</div>';
+}
+
+// ============ Реєстр векторних іконок (Lucide-стиль) ============
+// Єдине джерело правди для всіх іконок інтерфейсу. Inline SVG,
+// stroke=currentColor — колір успадковується від тексту/кнопки й працює
+// в обох темах. Емодзі прибрано, щоб вигляд не залежав від шрифту ОС.
+// Статичні місця позначені атрибутом data-icon="<назва>" і заповнюються
+// paintIcons(); JS-рендер вставляє ICONS.<назва> напряму в розмітку.
+const SVG_ATTRS = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+const ICON_PATHS = {
+  'copy':'<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  'check':'<polyline points="20 6 9 17 4 12"/>',
+  'log-out':'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+  'sun':'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+  'moon':'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+  'arrow-left':'<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',
+  'book-open':'<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+  'layers':'<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+  'check-square':'<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+  'search':'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  'target':'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  'shuffle':'<path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/>',
+  'rotate-ccw':'<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
+  'folder':'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
+  'eye-off':'<path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c7 0 10 8 10 8a13.2 13.2 0 0 1-1.67 2.68"/><path d="M6.6 6.6A13.5 13.5 0 0 0 2 12s3 8 10 8a9.7 9.7 0 0 0 5.4-1.6"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="2" y1="2" x2="22" y2="22"/>'
+};
+const ICONS = {};
+for(const k in ICON_PATHS){ ICONS[k] = '<svg '+SVG_ATTRS+'>'+ICON_PATHS[k]+'</svg>'; }
+// Заповнює всі статичні [data-icon] у переданому корені (типово — весь документ).
+function paintIcons(root){
+  (root || document).querySelectorAll('[data-icon]').forEach(el=>{
+    const name = el.dataset.icon;
+    if(ICONS[name]) el.innerHTML = ICONS[name];
+  });
+}
+const ICON_COPY = ICONS.copy, ICON_CHECK = ICONS.check;
+
+// Текст питання для копіювання: заголовок + еталонна відповідь (q.exam),
+// fenced-блоки коду (```…```) — те, що renderMarkdown() рендерить як
+// блок коду, — замінюємо плейсхолдером; інлайн-`код` лишаємо (короткі
+// ідентифікатори, не лістинги). Ціль — вставити ментору або в чат LLM.
+function stripCodeBlocks(text){
+  return (text || '').replace(/```[\s\S]*?```/g, '[код пропущено]')
+    .replace(/\n{3,}/g, '\n\n').trim();
+}
+function copyQuestionText(q, btn){
+  const txt = 'Питання: ' + q.title.trim() + '\n\n' + stripCodeBlocks(q.exam);
+  const done = ()=>{
+    btn.innerHTML = ICON_CHECK; btn.classList.add('copied');
+    setTimeout(()=>{ btn.innerHTML = ICON_COPY; btn.classList.remove('copied'); }, 1200);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done).catch(()=>fallbackCopy(txt, done));
+  } else {
+    fallbackCopy(txt, done);
+  }
+}
+function fallbackCopy(txt, done){
+  const ta = document.createElement('textarea');
+  ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); done(); } finally { ta.remove(); }
 }
 
 /* ============================================================
@@ -817,14 +923,17 @@ function renderReader(){
         '<div class="q-head">'+
           '<span class="dbadge '+q.depth+'" title="'+DEPTH_LABEL[q.depth]+'"></span>'+
           '<span class="q-title"><span class="id">'+q.id+'</span>'+esc(q.title)+'</span>'+
+          '<button class="copy-btn" type="button" title="Скопіювати текст питання (без коду)" aria-label="Скопіювати текст питання">'+ICON_COPY+'</button>'+
           '<button class="status '+(st!=='new'?st:'')+'">'+STATUS_TXT[st]+'</button>'+
         '</div>'+
         '<div class="answer md"></div>';
       const head = qEl.querySelector('.q-head');
       const ans = qEl.querySelector('.answer');
       const stBtn = qEl.querySelector('.status');
+      const copyBtn = qEl.querySelector('.copy-btn');
+      copyBtn.onclick = (e)=>{ e.stopPropagation(); copyQuestionText(q, copyBtn); };
       head.onclick = (e)=>{
-        if(e.target === stBtn) return;
+        if(e.target === stBtn || e.target === copyBtn) return;
         if(!ans.innerHTML) ans.innerHTML = examHtml(k, q) + md(k, q.md);
         const willClose = qEl.classList.contains('open');
         qEl.classList.toggle('open');
@@ -858,7 +967,7 @@ function renderReader(){
     root.appendChild(el);
   });
   if(!shown){
-    root.innerHTML = '<div class="empty"><div class="big">🔍</div>Нічого не знайдено — спробуй змінити фільтри або пошук.</div>';
+    root.innerHTML = '<div class="empty"><div class="big">'+ICONS.search+'</div>Нічого не знайдено — спробуй змінити фільтри або пошук.</div>';
   }
 }
 
@@ -887,19 +996,27 @@ function buildDeckControls(){
   depSel.value = deckFilter.depth;
   depSel.onchange = ()=>{ deckFilter.depth = depSel.value; rebuildDeck(); };
 
-  const onlyNew = document.createElement('label');
-  onlyNew.className = 'toggle'; onlyNew.style.margin='0';
-  onlyNew.innerHTML = '<input type="checkbox"'+(deckFilter.onlyNew?' checked':'')+'> лише невивчені';
-  onlyNew.querySelector('input').onchange = e=>{ deckFilter.onlyNew = e.target.checked; rebuildDeck(); };
+  const onlyNew = document.createElement('button');
+  onlyNew.type = 'button';
+  onlyNew.className = 'chip chip-toggle' + (deckFilter.onlyNew ? ' on' : '');
+  onlyNew.style.margin = '0';
+  onlyNew.setAttribute('aria-pressed', deckFilter.onlyNew ? 'true' : 'false');
+  onlyNew.innerHTML = '<span class="chip-ic">'+ICONS['eye-off']+'</span> лише невивчені';
+  onlyNew.onclick = ()=>{
+    deckFilter.onlyNew = !deckFilter.onlyNew;
+    onlyNew.classList.toggle('on', deckFilter.onlyNew);
+    onlyNew.setAttribute('aria-pressed', deckFilter.onlyNew ? 'true' : 'false');
+    rebuildDeck();
+  };
 
   const shuffleBtn = document.createElement('button');
   shuffleBtn.className = 'mini-btn';
-  shuffleBtn.textContent = '🔀 перемішати';
+  shuffleBtn.innerHTML = ICONS.shuffle + ' перемішати';
   shuffleBtn.onclick = ()=>{ deckFilter.shuffle = true; rebuildDeck(); };
 
   const restartBtn = document.createElement('button');
   restartBtn.className = 'mini-btn';
-  restartBtn.textContent = '↺ спочатку';
+  restartBtn.innerHTML = ICONS['rotate-ccw'] + ' спочатку';
   restartBtn.onclick = ()=>{ deckFilter.shuffle = false; rebuildDeck(); };
 
   c.append(catSel, depSel, onlyNew, shuffleBtn, restartBtn);
@@ -928,7 +1045,7 @@ function renderCard(){
   const knownInDeck = deck.filter(c=>qstatus(c.key)==='known').length;
   $('#deckKnown').textContent = '✓ '+knownInDeck;
   if(!total){
-    area.innerHTML = '<div class="empty"><div class="big">🗂️</div>Колода порожня для цих фільтрів.</div>';
+    area.innerHTML = '<div class="empty"><div class="big">'+ICONS.folder+'</div>Колода порожня для цих фільтрів.</div>';
     $('#deckPos').textContent = '0 / 0'; $('#deckProg').style.width='0%'; return;
   }
   if(deckIdx >= total){
@@ -952,16 +1069,15 @@ function renderCard(){
       '</div>'+
       '<div class="card-q"><span style="font-family:var(--mono);font-size:.7em;color:var(--mute)">'+q.id+'&nbsp;&nbsp;</span>'+esc(q.title)+'</div>'+
       (revealed
-        ? '<div class="card-a md">'+examHtml(key,q)+
-            (fullShown
-              ? md(key,q.md)
-              : '<div class="full-toggle"><button class="mini-btn" id="fullBtn">📖 Повний розбір</button></div>')+
-          '</div>'
+        // текст відповіді скролиться в межах .card-a; кнопку «Повний розбір»
+        // виносимо ПОЗА скрол-зону, щоб вона не ховалась під нижнім краєм
+        ? '<div class="card-a md">'+examHtml(key,q)+(fullShown?md(key,q.md):'')+'</div>'+
+          (fullShown?'':'<div class="full-toggle"><button class="mini-btn" id="fullBtn">'+ICONS['book-open']+' Повний розбір</button></div>')
         : '<div class="reveal-hint">Спробуй відповісти вголос, тоді звір з еталоном ↓</div>')+
       (revealed
         ? '<div class="deck-actions">'+
-            '<button class="btn repeat" id="repeatBtn">↻ Повторити <kbd>1</kbd></button>'+
-            '<button class="btn know" id="knowBtn">✓ Знаю <kbd>2</kbd></button>'+
+            '<button class="btn repeat" id="repeatBtn">'+ICONS['rotate-ccw']+' Повторити <kbd>1</kbd></button>'+
+            '<button class="btn know" id="knowBtn">'+ICONS.check+' Знаю <kbd>2</kbd></button>'+
           '</div>'
         : '<div class="deck-actions"><button class="btn primary" id="revealBtn">Показати відповідь <kbd>Space</kbd></button></div>')+
     '</div>';
@@ -1043,10 +1159,21 @@ function switchTab(name){
 function applyTheme(){
   document.documentElement.setAttribute('data-theme', state.theme);
   localStorage.setItem(THEME_KEY, state.theme);
-  $('#themeBtn').textContent = state.theme==='dark' ? '☀' : '☾';
+  // показуємо іконку «пункту призначення»: у темній темі — сонце (перемкнути
+  // на світлу), у світлій — місяць (перемкнути на темну)
+  $('#themeBtn').innerHTML = state.theme==='dark' ? ICONS.sun : ICONS.moon;
+}
+
+// синхронізує вигляд чипа-перемикача «приховати вивчені» зі станом filter.hideKnown
+function syncHideKnownChip(){
+  const b = $('#hideKnown');
+  if(!b) return;
+  b.classList.toggle('on', filter.hideKnown);
+  b.setAttribute('aria-pressed', filter.hideKnown ? 'true' : 'false');
 }
 
 function init(){
+  paintIcons(); // заповнити всі статичні [data-icon] векторними SVG
   const total = DATA.totals.questions;
   $('#cntReader').textContent = total;
   $('#cntCards').textContent = total;
@@ -1068,7 +1195,7 @@ function init(){
   window.addEventListener('resize', syncStickTop);
 
   $('#search').oninput = e=>{ filter.search = e.target.value.trim(); renderReader(); };
-  $('#hideKnown').onchange = e=>{ filter.hideKnown = e.target.checked; renderReader(); };
+  $('#hideKnown').onclick = ()=>{ filter.hideKnown = !filter.hideKnown; syncHideKnownChip(); renderReader(); };
   document.querySelectorAll('.tab').forEach(t=>t.onclick = ()=>switchTab(t.dataset.tab));
   $('#themeBtn').onclick = ()=>{ state.theme = state.theme==='dark'?'light':'dark'; applyTheme(); save(); };
   $('#logoutBtn').onclick = async ()=>{
