@@ -18,6 +18,9 @@ PWA_HEAD_PLACEHOLDER
   --code-bg:#0e1017; --code-line:#20242f;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 30px rgba(0,0,0,.28);
   --radius:16px;
+  /* спільна висота контролів фільтрів (дропдаун, пошук, кнопки колоди):
+     вони стоять пліч-о-пліч, тож висоту задаємо явно, а не через падінги */
+  --ctl-h:34px;
   --font:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   --mono:ui-monospace,'SF Mono','JetBrains Mono',Menlo,Consolas,monospace;
 }
@@ -38,7 +41,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 ::selection{background:var(--accent-soft)}
 
 /* ============ Каркас ============ */
-.app{max-width:1000px;margin:0 auto;padding:0 18px calc(44px + env(safe-area-inset-bottom))}
+/* нижній відступ = висота кнопки «вгору» плюс її зазор: вона плаває саме тут,
+   і контент не має під неї підлазити */
+.app{max-width:1000px;margin:0 auto;padding:0 18px calc(60px + env(safe-area-inset-bottom))}
 
 .topbar{display:flex;align-items:center;flex-wrap:wrap;gap:12px 16px;padding:22px 0 18px;
   position:sticky;top:0;z-index:20;background:var(--bg)}
@@ -70,6 +75,29 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
   background:var(--panel);color:var(--text);box-shadow:var(--shadow);font-size:13.5px;
   max-width:calc(100vw - 32px)}
 .session-banner.visible{display:flex}
+
+/* ============ Кнопка «вгору» ============ */
+/* З'являється лише коли гортати вгору справді далеко. Кут — щоб не ловити
+   міскліки: пункти чеклиста і рядки питань тягнуться на всю ширину, тому
+   кнопка живе у нижньому відступі .app, який під неї й розрахований. */
+.to-top{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:45;
+  width:44px;height:44px;display:flex;align-items:center;justify-content:center;
+  border-radius:50%;border:1px solid var(--border);background:var(--panel);color:var(--dim);
+  cursor:pointer;box-shadow:var(--shadow);backdrop-filter:blur(6px);
+  opacity:0;transform:translateY(8px);transition:opacity .18s,transform .18s,color .14s,border-color .14s}
+.to-top.show{opacity:1;transform:none}
+/* Невидимий «жолоб» довкола: пункти чеклиста і рядки питань клікабельні всією
+   площею, тож промах на кілька пікселів відмітив би пункт виконаним. Це поле
+   належить кнопці, тому такий промах — усе одно натискання «вгору».
+   Прямокутне навмисно: у круглого кути лишали б діагональний промах
+   (найчастіший — вниз-вліво, у пункт під кнопкою) поза її зоною. */
+.to-top::before{content:'';position:absolute;inset:-11px}
+.to-top:not(.show){pointer-events:none} /* прихована кнопка не ловить кліки */
+.to-top:hover{color:var(--text);border-color:var(--accent)}
+.to-top svg{width:19px;height:19px;display:block}
+/* поки відкрито оверлей джерела або висить банер сесії — кнопка мовчить,
+   щоб не накладатися на них */
+body.src-open .to-top,body.session-open .to-top{opacity:0;pointer-events:none}
 .session-banner button{flex:none;font-family:var(--font);font-size:13px;font-weight:600;
   padding:7px 12px;border-radius:9px;border:1px solid var(--warn);background:var(--warn-soft);
   color:var(--warn);cursor:pointer}
@@ -90,23 +118,52 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
 /* ============ Фільтри ============ */
-.filters{display:flex;flex-direction:column;gap:12px;margin-bottom:18px}
-.search{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);
-  background:var(--panel);color:var(--text);font-family:var(--font);font-size:14.5px;outline:none;transition:.16s}
+/* один рядок: дропдауни ліворуч, пошук притиснутий до протилежного краю
+   (margin-left:auto). На вужчих екранах пошук переноситься нижче сам */
+.filters{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.filters .search-wrap{margin-left:auto;flex:1 1 240px;max-width:400px}
+.search{width:100%;height:var(--ctl-h);padding:0 14px;border-radius:10px;border:1px solid var(--border);
+  background:var(--panel);color:var(--text);font-family:var(--font);font-size:13px;outline:none;transition:.16s}
 .search:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .search::placeholder{color:var(--mute)}
-.chips{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
-.chip{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:10px;
-  border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;
-  font-size:12.5px;font-weight:500;transition:.14s;user-select:none}
-.chip:hover{transform:translateY(-1px)}
-.chip.off{opacity:.4;filter:saturate(.5)}
-.chip .dot{width:9px;height:9px;border-radius:50%;flex:none}
-.chip .n{font-family:var(--mono);font-size:10.5px;color:var(--mute)}
+.dd-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.dot{width:9px;height:9px;border-radius:50%;flex:none}
 .dot.deep{background:var(--deep)} .dot.mid{background:var(--mid)} .dot.aware{background:var(--aware)}
-.toggle{margin-left:auto;font-size:12.5px;color:var(--dim);display:inline-flex;align-items:center;
-  gap:7px;cursor:pointer;user-select:none}
-.toggle input{accent-color:var(--accent);width:15px;height:15px}
+/* статус вивчення: ті самі кольори, що й у кнопки статусу питання (.status) */
+.dot.st-new{background:var(--mute)} .dot.st-learning{background:var(--warn)} .dot.st-known{background:var(--good)}
+
+/* мультивибірний дропдаун (категорії / рівні / статус — і в читалці, і в колоді) */
+.dd{position:relative}
+.dd-trigger{display:inline-flex;align-items:center;gap:9px;height:var(--ctl-h);padding:0 12px;
+  border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--text);
+  cursor:pointer;font-family:var(--font);font-size:12.5px;font-weight:500;line-height:1;transition:.14s}
+.dd-trigger:hover{border-color:var(--accent)}
+.dd.open .dd-trigger{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.dd-chev{display:inline-flex;color:var(--mute);transition:transform .16s}
+.dd-chev svg{width:14px;height:14px;display:block}
+.dd.open .dd-chev{transform:rotate(180deg)}
+/* панель розкривається строго ПІД тригером. Саме тому це не нативний <select>:
+   його меню на macOS відкривається ПОВЕРХ контрола і накриває сам селектор */
+/* z-index нижчий за липкий топбар (20): рядок фільтрів не липкий, тож при
+   скролі панель має заїжджати ПІД топбар, а не малюватись поверх нього */
+.dd-panel{position:absolute;top:calc(100% + 6px);left:0;z-index:15;min-width:max(100%,196px);
+  max-width:calc(100vw - 24px);max-height:min(58vh,330px);overflow-y:auto;overscroll-behavior:contain;
+  padding:6px;border-radius:12px;border:1px solid var(--border);background:var(--card);box-shadow:var(--shadow)}
+/* тригер біля правого краю: панель вирівнюється по ньому вправо, щоб не вилізти
+   за екран (клас ставить openDropdown після заміру) */
+.dd.dd-right .dd-panel{left:auto;right:0}
+.dd-opt{display:flex;align-items:center;gap:9px;width:100%;padding:8px 9px;border-radius:8px;
+  border:0;background:none;color:var(--text);cursor:pointer;text-align:left;
+  font-family:var(--font);font-size:12.5px;line-height:1.25}
+.dd-opt:hover{background:var(--card-hi)}
+.dd-check{width:13px;flex:none;display:inline-flex;color:var(--accent);visibility:hidden}
+.dd-check svg{width:13px;height:13px;display:block;stroke-width:3}
+.dd-opt[aria-selected="true"] .dd-check{visibility:visible}
+.dd-txt{flex:1;min-width:0}
+.dd-opt .n{font-family:var(--mono);font-size:10.5px;color:var(--mute);flex:none}
+.dd-all{color:var(--dim)}
+.dd-all .dot{visibility:hidden}
+.dd-sep{height:1px;background:var(--border);margin:5px 3px}
 
 /* ============ Векторні іконки: розміри під контекст ============ */
 .icon-btn svg{width:18px;height:18px;display:block}
@@ -116,7 +173,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
    збігалися з ОПТИЧНИМ центром тексту, а не з центром високого line-box */
 button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;line-height:1}
 .mini-btn svg,.btn svg{width:15px;height:15px;display:block;flex:none}
-.tab,.chip,.pill.depth{line-height:1}
+/* line-height:1 на ВСІХ пилюлях, не лише на .depth: інакше решта беруть
+   успадковані 1.55 і стають на 5px вищими за неї в тому самому рядку */
+.tab,.pill{line-height:1}
 .pill.depth .dbadge{margin-top:0} /* скидаємо зсув, потрібний лише в .q-head */
 .exam-label svg{width:14px;height:14px;display:block;flex:none}
 .empty .big svg{width:42px;height:42px;stroke-width:1.5;color:var(--mute);display:inline-block}
@@ -124,12 +183,8 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 .search-wrap{position:relative}
 .search-ic{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--mute);
   display:flex;pointer-events:none}
-.search-ic svg{width:16px;height:16px;display:block}
-.search-wrap .search{padding-left:42px}
-/* чип-перемикач «приховати вивчені» — у стилі .chip, активний залито акцентом */
-.chip-toggle{margin-left:auto;font-family:var(--font)}
-.chip-toggle .chip-ic{display:inline-flex} .chip-toggle .chip-ic svg{width:14px;height:14px;display:block}
-.chip-toggle.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.search-ic svg{width:15px;height:15px;display:block}
+.search-wrap .search{padding-left:38px}
 
 /* ============ Читалка ============ */
 .cat{margin-bottom:10px;border:1px solid var(--border);border-radius:var(--radius);
@@ -138,8 +193,10 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 .cat-bar{width:4px;align-self:stretch;border-radius:3px;flex:none}
 .cat-name{font-size:16px;font-weight:700;letter-spacing:-.01em;flex:1;min-width:0}
 .cat-meta{font-family:var(--mono);font-size:11px;color:var(--dim);flex:none;text-align:right}
-.cat-meta .mini{width:74px;height:5px;background:var(--border);border-radius:20px;overflow:hidden;margin-top:5px}
-.cat-meta .mini i{display:block;height:100%;background:var(--good);border-radius:20px;transition:width .4s}
+/* мінісмужка прогресу — спільна для заголовків категорій і шапки чеклиста */
+.mini{height:5px;background:var(--border);border-radius:20px;overflow:hidden}
+.mini i{display:block;height:100%;background:var(--good);border-radius:20px;transition:width .4s}
+.cat-meta .mini{width:74px;margin-top:5px}
 .chev{flex:none;color:var(--mute);transition:.22s;font-size:12px}
 .cat.closed .chev{transform:rotate(-90deg)}
 .cat.closed .items{display:none}
@@ -189,9 +246,13 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 .card{width:100%;min-height:340px;background:var(--card);border:1px solid var(--border);
   border-radius:20px;box-shadow:var(--shadow);padding:26px 26px 14px;display:flex;flex-direction:column}
 .card-top{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
-.pill{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
-  padding:4px 9px;border-radius:20px;border:1px solid var(--border);color:var(--dim)}
-.pill.depth{display:inline-flex;align-items:center;gap:6px}
+/* inline-flex і метрика однакові для всіх пилюль — з крапкою (.depth) і без */
+.pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;
+  letter-spacing:.05em;text-transform:uppercase;padding:6px 10px;border-radius:20px;
+  border:1px solid var(--border);color:var(--dim)}
+/* бордер у тон крапки: пилюлі категорії та статусу поруч теж кольорові, і сірий
+   контур глибини випадав із трійки. Текст лишаємо приглушеним — сигнал несе крапка */
+.pill.deep{border-color:var(--deep)} .pill.mid{border-color:var(--mid)} .pill.aware{border-color:var(--aware)}
 .card-q{font-size:20px;font-weight:700;letter-spacing:-.01em;line-height:1.3}
 .card-a{margin-top:18px;padding-top:18px;border-top:1px dashed var(--border);font-size:14.5px}
 .reveal-hint{margin-top:auto;padding-top:22px;text-align:center;color:var(--mute);font-size:13px}
@@ -211,13 +272,24 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
   border-radius:5px;padding:1px 5px;line-height:1}
 .deck-controls{width:100%;display:flex;gap:8px;flex-wrap:wrap;align-items:center;
   justify-content:center;font-size:12.5px}
-.mini-btn,select.mini-btn{font-family:var(--mono);font-size:11px;padding:7px 11px;border-radius:9px;
+/* спільна висота з дропдаунами і пошуком: кнопки або стоять із ними в одному
+   рядку (колода), або є єдиним контролом свого блоку (чеклист, картка) —
+   і в обох випадках 27px були і дрібними на вигляд, і замалими для тапу */
+.mini-btn{font-family:var(--mono);font-size:11px;height:var(--ctl-h);padding:0 12px;border-radius:10px;
   border:1px solid var(--border);background:var(--panel);color:var(--dim);cursor:pointer;transition:.14s}
 .mini-btn:hover{color:var(--text);border-color:var(--accent)}
 
 /* ============ Чеклист ============ */
-.chk-legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:18px;font-size:12.5px;color:var(--dim)}
+/* шапка вкладки: легенда глибин ліворуч, прогрес — праворуч у тому ж рядку */
+.chk-head{display:flex;align-items:center;gap:12px 18px;flex-wrap:wrap;margin-bottom:18px}
+.chk-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--dim)}
 .chk-legend span{display:inline-flex;align-items:center;gap:7px}
+/* лічильник виконаного — не рядок тексту, а такий самий контроль прогресу, як
+   у заголовках категорій: число + мінісмужка */
+.chk-progress{display:flex;align-items:center;gap:10px;margin-left:auto;
+  font-family:var(--mono);font-size:11px;color:var(--dim)}
+.chk-progress b{color:var(--text)}
+.chk-progress .mini{width:120px}
 .chk-cat{margin-bottom:14px;border:1px solid var(--border);border-radius:var(--radius);
   background:var(--card);overflow:hidden;box-shadow:var(--shadow)}
 .chk-item{display:flex;align-items:flex-start;gap:12px;padding:12px 17px;border-top:1px solid var(--border-soft);
@@ -318,21 +390,43 @@ body.src-open{overflow:hidden}
 .footer{text-align:center;margin-top:22px;font-size:11.5px;color:var(--mute);font-family:var(--mono)}
 
 /* планшет і вужче — більші контроли Флеш-карток (зручніший тап) */
+/* планшет і вужче — більші тап-цілі в усіх контролах фільтрів одразу */
 @media (max-width:900px){
+  :root{--ctl-h:42px}
   .deck-controls{gap:10px}
-  .deck-controls .mini-btn,.deck-controls select.mini-btn,.deck-controls .chip-toggle{
-    font-size:14px;padding:12px 16px;border-radius:11px}
-  .deck-controls .mini-btn svg,.deck-controls .chip-toggle .chip-ic svg{width:16px;height:16px}
+  .deck-controls .mini-btn,.deck-controls .dd-trigger{font-size:13.5px;padding:0 14px;border-radius:11px}
+  /* моно-11px у 42-піксельній кнопці губиться; на планшеті теж */
+  .src-bar .mini-btn{font-size:12.5px}
+  .deck-controls .mini-btn svg{width:16px;height:16px}
+}
+
+/* вузько для «фільтри | пошук» в один рядок: пошук переноситься — і тоді має
+   займати рядок повністю, інакше висить праворуч із пустотою під дропдаунами */
+@media (max-width:700px){
+  .filters .search-wrap{flex-basis:100%;max-width:none;margin-left:0}
 }
 
 @media (max-width:560px){
-  .app{padding:0 7px calc(70px + env(safe-area-inset-bottom))}
-  .filters{gap:8px;margin-bottom:14px}
-  .chip{flex:none;padding:9px 13px;font-size:13.5px;gap:7px}
-  #catChips,#depthChips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;
-    min-width:0;margin:0 -7px;padding:0 7px}
-  #catChips::-webkit-scrollbar,#depthChips::-webkit-scrollbar{display:none}
-  .toggle{padding:2px 0}
+  /* 56 = кнопка «вгору» (44) + її зазор (12). Було 70 — і на вкладці, що майже
+     вміщалась, лишалися 9px порожнього скролу «ні для чого» */
+  .app{padding:0 7px calc(56px + env(safe-area-inset-bottom))}
+  .to-top{bottom:calc(12px + env(safe-area-inset-bottom));right:12px}
+  /* Телефон: контроли фільтрів стають рівною сіткою 2×N замість «як вийшло».
+     display:contents на #filterRow піднімає самі .dd у клітинки сітки, тому
+     дропдауни і пошук вирівняні по одних і тих самих колонках. */
+  .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+  #filterRow{display:contents}
+  .filters .search-wrap{margin-left:0;max-width:none}
+  /* колода: три фільтри займають два перші рядки (третій — на всю ширину),
+     дві дії лишаються разом в останньому. Інакше «перемішати» стоїть у колонці
+     поруч зі «Усі статуси» і читається як ще один фільтр. */
+  .deck-controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .deck-controls .dd-status{grid-column:span 2}
+  .dd,.dd-trigger,.deck-controls .mini-btn{width:100%}
+  .dd-trigger{padding:0 13px;font-size:13.5px;justify-content:space-between}
+  .dd-opt{padding:11px 10px;font-size:14px}
+  /* 16px — не косметика: за меншого шрифту iOS зумить сторінку на фокусі поля */
+  .search{font-size:16px}
   .topbar{padding:16px 0 14px;gap:10px}
   .brand{flex:1 1 100%;order:1}
   .nav-back{order:2}
@@ -351,6 +445,17 @@ body.src-open{overflow:hidden}
   .q-head{padding:12px 12px}
   .answer{padding:2px 12px 18px 12px}
   .chk-item{padding:12px 12px}
+  /* кнопка й так переноситься на власний рядок — хай займе його повністю,
+     а не висить праворуч із пустотою (те саме рішення, що для пошуку) */
+  .src-bar .mini-btn{flex-basis:100%;margin-left:0}
+  /* на телефоні шапка стає у стовпчик, і прогрес іде ПЕРШИМ: це головне число
+     вкладки, а легенда кольорів — довідка. Смужка тягнеться на решту рядка */
+  .chk-head{flex-direction:column;align-items:stretch;gap:10px}
+  .chk-progress{order:-1;margin-left:0;font-size:12px}
+  .chk-progress .mini{flex:1;width:auto}
+  /* легенда розтягується на ту саму ширину, що й рядок прогресу над нею —
+     інакше вона тулиться ліворуч і два рядки шапки не тримають спільну сітку */
+  .chk-legend{justify-content:space-between;gap:10px}
   .src-ov{padding:0}
   .src-panel{max-height:100vh;height:100%;border:none;border-radius:0}
   .src-head,.src-legend,.src-body{padding-left:14px;padding-right:14px}
@@ -388,14 +493,11 @@ body.src-open{overflow:hidden}
   <!-- ЧИТАЛКА -->
   <section class="view active" id="view-reader">
     <div class="filters">
+      <!-- фільтри ліворуч, пошук — на протилежному боці того самого рядка -->
+      <div class="dd-row" id="filterRow"></div>
       <div class="search-wrap">
         <span class="search-ic" data-icon="search"></span>
-        <input class="search" id="search" type="search" placeholder="Пошук по питаннях і відповідях…" autocomplete="off">
-      </div>
-      <div class="chips" id="catChips"></div>
-      <div class="chips">
-        <div class="chips" id="depthChips"></div>
-        <button class="chip chip-toggle" id="hideKnown" type="button" aria-pressed="false"><span class="chip-ic" data-icon="eye-off"></span> Приховати вивчені</button>
+        <input class="search" id="search" type="search" autocomplete="off">
       </div>
     </div>
     <div id="readerList"></div>
@@ -416,11 +518,16 @@ body.src-open{overflow:hidden}
 
   <!-- ЧЕКЛИСТ -->
   <section class="view" id="view-check">
-    <div class="chk-legend">
-      <span><span class="dbadge deep"></span> Добре знати</span>
-      <span><span class="dbadge mid"></span> Знати</span>
-      <span><span class="dbadge aware"></span> Поверхнево</span>
-      <span style="margin-left:auto"><b id="chkDone">0</b> / <span id="chkTotal">0</span> виконано</span>
+    <div class="chk-head">
+      <div class="chk-legend">
+        <span><span class="dbadge deep"></span> Добре знати</span>
+        <span><span class="dbadge mid"></span> Знати</span>
+        <span><span class="dbadge aware"></span> Поверхнево</span>
+      </div>
+      <div class="chk-progress">
+        <span><b id="chkDone">0</b> / <span id="chkTotal">0</span> виконано</span>
+        <span class="mini"><i id="chkBar"></i></span>
+      </div>
     </div>
     <div class="src-bar" id="srcBar" hidden>
       <span>Джерело: <b id="srcBarName"></b></span>
@@ -432,6 +539,9 @@ body.src-open{overflow:hidden}
   <div class="footer">згенеровано з навчальних .md
     · <a href="#" id="resetBtn" style="color:var(--mute)">скинути прогрес</a></div>
 </div>
+
+<button class="to-top" id="toTopBtn" type="button" title="Вгору" aria-label="Прокрутити вгору"
+  data-icon="arrow-up"></button>
 
 <!-- ДЖЕРЕЛО: вихідна матриця компетенцій -->
 <div class="src-ov" id="srcOverlay" role="dialog" aria-modal="true" aria-labelledby="srcTitle" hidden>
@@ -482,6 +592,13 @@ function clearLocalProgress(){
 
 const DEPTH_LABEL = {deep:'Добре знати', mid:'Знати', aware:'Поверхнево'};
 const DEPTH_ORDER = ['deep','mid','aware'];
+// Статуси вивчення (qstatus): порядок = «від незнання до знання», у цьому
+// порядку малюються чипи фільтра. Оголошено тут, а не поруч із читалкою:
+// filter/deckFilter ініціалізуються цим набором вище за той код.
+const STATUS_ORDER = ['new','learning','known'];
+// Підписи для фільтра — іменні, повні. Терсні («◐ вчу») лишаються в
+// STATUS_TXT для кнопки статусу самого питання, де місця мало.
+const STATUS_FILTER_TXT = {new:'Не чіпалося', learning:'Вчу', known:'Знаю'};
 const CAT_COLOR = {'front-end':'#f59e0b','back-end':'#ec4899','databases':'#14b8a6',
   'code-delivery':'#f97316','methodology':'#8b5cf6'};
 
@@ -526,6 +643,8 @@ function setBadge(kind){
 function showSessionBanner(){
   const el = document.getElementById('sessionBanner');
   if(el) el.classList.add('visible');
+  // банер фіксований унизу — прибирає звідти кнопку «вгору» (див. CSS)
+  document.body.classList.add('session-open');
 }
 (function(){
   const btn = document.getElementById('sessionReloadBtn');
@@ -675,10 +794,11 @@ function openQuestion(key){
   const hit = Q_BY_KEY[key];
   if(!hit) return;
   filter = {cats:new Set(DATA.categories.map(c=>c.key)), depths:new Set(DEPTH_ORDER),
-    search:'', hideKnown:false};
+    statuses:new Set(STATUS_ORDER), search:''};
   $('#search').value = '';
-  syncHideKnownChip();
-  buildChips();
+  clearTimeout(searchTimer); // інакше недобіглий дебаунс поверне старий запит уже після скидання
+  closeDropdown();
+  buildReaderFilters(); // перебудовує три дропдауни — підписи тригерів стають «Усі …»
   state['open_'+hit.cat.key] = true; save();
   renderReader();
   switchTab('reader');
@@ -697,11 +817,12 @@ function scrollQuestionToTop(qEl){
   window.scrollTo({top: scrollY + qEl.getBoundingClientRect().top - offset, behavior:'smooth'});
 }
 
-function knownCount(){
-  let n=0;
-  for(const c of DATA.categories) for(const q of c.questions)
-    if(state.q[qkey(c,q)]==='known') n++;
-  return n;
+// Скільки питань у кожному статусі — за один прохід: числа потрібні і кільцю
+// прогресу (known), і лічильникам на чипах фільтра статусу.
+function statusCounts(){
+  const c = {new:0, learning:0, known:0};
+  for(const cat of DATA.categories) for(const q of cat.questions) c[qstatus(qkey(cat,q))]++;
+  return c;
 }
 
 /* ============================================================
@@ -856,6 +977,8 @@ const ICON_PATHS = {
   'sun':'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
   'moon':'<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
   'arrow-left':'<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',
+  'chevron-down':'<polyline points="6 9 12 15 18 9"/>',
+  'arrow-up':'<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>',
   'book-open':'<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
   'layers':'<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
   'check-square':'<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
@@ -863,8 +986,7 @@ const ICON_PATHS = {
   'target':'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
   'shuffle':'<path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/>',
   'rotate-ccw':'<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
-  'folder':'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
-  'eye-off':'<path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c7 0 10 8 10 8a13.2 13.2 0 0 1-1.67 2.68"/><path d="M6.6 6.6A13.5 13.5 0 0 0 2 12s3 8 10 8a9.7 9.7 0 0 0 5.4-1.6"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="2" y1="2" x2="22" y2="22"/>'
+  'folder':'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>'
 };
 const ICONS = {};
 for(const k in ICON_PATHS){ ICONS[k] = '<svg '+SVG_ATTRS+'>'+ICON_PATHS[k]+'</svg>'; }
@@ -909,12 +1031,20 @@ function fallbackCopy(txt, done){
    ============================================================ */
 function refreshProgress(){
   const total = DATA.totals.questions;
-  const known = knownCount();
+  const counts = statusCounts();
+  const known = counts.known;
   const pct = total ? Math.round(known/total*100) : 0;
   $('#ring').style.setProperty('--p', pct);
   $('#ringPct').textContent = pct+'%';
   $('#knownN').textContent = known;
   $('#totalN').textContent = total;
+  // Числа у дропдауні статусу — динамічні (на відміну від категорій і рівнів,
+  // де вони сталі), тому оновлюємо їх на місці в обох вкладках одразу:
+  // refreshProgress() викликається з кожного setStatus.
+  document.querySelectorAll('.dd-status .dd-opt[data-v]').forEach(b=>{
+    const n = b.querySelector('.n');
+    if(n) n.textContent = counts[b.dataset.v];
+  });
   document.querySelectorAll('.cat').forEach(el=>{
     const key = el.dataset.key;
     const cat = DATA.categories.find(c=>c.key===key);
@@ -931,42 +1061,188 @@ function refreshProgress(){
    ЧИТАЛКА
    ============================================================ */
 let filter = {cats:new Set(DATA.categories.map(c=>c.key)), depths:new Set(DEPTH_ORDER),
-  search:'', hideKnown:false};
+  statuses:new Set(STATUS_ORDER), search:''};
 
-function buildChips(){
-  const cc = $('#catChips');
-  cc.innerHTML = '';
-  DATA.categories.forEach(cat=>{
-    const b = document.createElement('button');
-    b.className = 'chip';
-    b.innerHTML = '<span class="dot" style="background:'+CAT_COLOR[cat.key]+'"></span>'+
-      cat.name+' <span class="n">'+cat.questions.length+'</span>';
-    b.onclick = () => { toggleSet(filter.cats, cat.key); b.classList.toggle('off'); renderReader(); };
-    cc.appendChild(b);
-  });
-  const dc = $('#depthChips');
-  dc.innerHTML = '';
-  DEPTH_ORDER.forEach(d=>{
-    const cnt = DATA.totals.depth[d];
-    const b = document.createElement('button');
-    b.className = 'chip';
-    b.innerHTML = '<span class="dot '+d+'"></span>'+DEPTH_LABEL[d]+' <span class="n">'+cnt+'</span>';
-    b.onclick = () => { toggleSet(filter.depths, d); b.classList.toggle('off'); renderReader(); };
-    dc.appendChild(b);
-  });
+/* ============ Фільтри: мультивибірний дропдаун ============ */
+// Один компонент на всі фільтри обох вкладок. Нативний <select> не годиться
+// з двох причин: його меню на macOS відкривається ПОВЕРХ самого контрола, і
+// мультивибору без Ctrl він не вміє. Тут тригер + панель строго під ним.
+let ddOpen = null;     // відкритим може бути лише один дропдаун
+let ddOpenScrollY = 0; // позиція скролу на момент відкриття (див. слухач scroll)
+
+function closeDropdown(){
+  if(!ddOpen) return;
+  ddOpen.classList.remove('open','dd-right');
+  const panel = ddOpen.querySelector('.dd-panel');
+  panel.style.maxHeight = ''; // замір робиться заново на кожному відкритті
+  panel.hidden = true;
+  ddOpen.querySelector('.dd-trigger').setAttribute('aria-expanded','false');
+  ddOpen = null;
+}
+
+// Панель ширша за тригер, тож біля правого краю вона вилізала б за екран
+// (у рядку колоди контроли центровані — крайній тригер стоїть близько до краю).
+// Заміряємо вже показану панель і за потреби вирівнюємо її вправо.
+function openDropdown(root){
+  const panel = root.querySelector('.dd-panel');
+  root.classList.add('open');
+  panel.hidden = false;
+  root.querySelector('.dd-trigger').setAttribute('aria-expanded','true');
+  ddOpen = root;
+  ddOpenScrollY = window.scrollY;
+  const box = panel.getBoundingClientRect();
+  if(box.right > document.documentElement.clientWidth - 8) root.classList.add('dd-right');
+  // висота — по місцю, що лишилось до низу екрана (телефон в альбомі: там
+  // під тригером менше двохсот пікселів). Нижня межа, щоб панель не
+  // виродилась у щілину, коли тригер зовсім унизу — далі працює скрол.
+  const space = window.innerHeight - box.top - 12;
+  panel.style.maxHeight = Math.max(168, Math.min(330, space)) + 'px';
+}
+
+// options: [{value, label, count, dotClass?, dotColor?}]
+// nouns:   {all:'Усі категорії', some:'Категорії'} — підпис тригера
+// set — ЖИВИЙ Set фільтра: компонент його мутує, стан живе назовні
+function makeDropdown({options, nouns, set, onChange, cls}){
+  const root = document.createElement('div');
+  root.className = 'dd' + (cls ? ' '+cls : '');
+  root.innerHTML =
+    '<button class="dd-trigger" type="button" aria-expanded="false" aria-haspopup="listbox">'+
+      '<span class="dd-label"></span><span class="dd-chev">'+ICONS['chevron-down']+'</span>'+
+    '</button>'+
+    '<div class="dd-panel" role="listbox" aria-multiselectable="true" hidden>'+
+      '<button class="dd-opt dd-all" type="button" role="option">'+
+        '<span class="dd-check">'+ICON_CHECK+'</span>'+
+        // невидима крапка — тримає підпис «Усі» на тій самій сітці, що й опції
+        '<span class="dot"></span><span class="dd-txt">Усі</span></button>'+
+      '<div class="dd-sep"></div>'+
+      options.map(o=>
+        '<button class="dd-opt" type="button" role="option" data-v="'+esc(o.value)+'">'+
+          '<span class="dd-check">'+ICON_CHECK+'</span>'+
+          '<span class="dot'+(o.dotClass?' '+o.dotClass:'')+'"'+
+            (o.dotColor?' style="background:'+o.dotColor+'"':'')+'></span>'+
+          '<span class="dd-txt">'+esc(o.label)+'</span>'+
+          '<span class="n">'+o.count+'</span>'+
+        '</button>').join('')+
+    '</div>';
+  const trigger = root.querySelector('.dd-trigger');
+  const panel = root.querySelector('.dd-panel');
+
+  function sync(){
+    panel.querySelectorAll('.dd-opt[data-v]').forEach(b=>
+      b.setAttribute('aria-selected', set.has(b.dataset.v) ? 'true' : 'false'));
+    const all = set.size === options.length;
+    panel.querySelector('.dd-all').setAttribute('aria-selected', all ? 'true' : 'false');
+    // Підпис тригера: назва групи, коли вибрано все або нічого не звужено;
+    // сама опція, коли лишилась одна (найчастіший випадок — «дивлю лише це»);
+    // інакше — скільки саме вибрано, бо перелічити їх у кнопці нема місця.
+    root.querySelector('.dd-label').textContent = all ? nouns.all
+      : set.size === 1 ? options.find(o=>set.has(o.value)).label
+      : nouns.some + ': ' + set.size;
+  }
+  sync();
+
+  trigger.onclick = e=>{
+    e.stopPropagation();
+    const wasOpen = ddOpen === root;
+    closeDropdown();          // відкритий сусід закривається
+    if(wasOpen) return;       // повторний клік по тому самому тригеру = закрити
+    openDropdown(root);
+  };
+  // Панель НЕ закривається після вибору: мультивибір зручно клацати серією.
+  panel.onclick = e=>{
+    e.stopPropagation();
+    const b = e.target.closest('.dd-opt');
+    if(!b) return;
+    if(b.classList.contains('dd-all')){
+      // «Усі» — тумблер усе/нічого. Дає дешеве «лише це»: зняти все і
+      // натиснути потрібне — два кліки замість N знімань.
+      const all = set.size === options.length;
+      set.clear();
+      if(!all) options.forEach(o=>set.add(o.value));
+    }else{
+      toggleSet(set, b.dataset.v);
+    }
+    sync();
+    onChange();
+  };
+  return root;
+}
+
+// Джерела опцій — спільні для читалки і колоди, тому підписи, кольори і
+// числа в обох вкладках однакові за побудовою, а не за домовленістю.
+const catOptions = ()=> DATA.categories.map(c=>
+  ({value:c.key, label:c.name, count:c.questions.length, dotColor:CAT_COLOR[c.key]}));
+const depthOptions = ()=> DEPTH_ORDER.map(d=>
+  ({value:d, label:DEPTH_LABEL[d], count:DATA.totals.depth[d], dotClass:d}));
+const statusOptions = ()=>{
+  const c = statusCounts();
+  return STATUS_ORDER.map(s=>
+    ({value:s, label:STATUS_FILTER_TXT[s], count:c[s], dotClass:'st-'+s}));
+};
+
+// Три дропдауни одного фільтра (filter або deckFilter) в один контейнер.
+function buildFilterDropdowns(host, f, onChange){
+  host.append(
+    makeDropdown({options:catOptions(), nouns:{all:'Усі категорії', some:'Категорії'},
+      set:f.cats, onChange}),
+    makeDropdown({options:depthOptions(), nouns:{all:'Усі рівні', some:'Рівні'},
+      set:f.depths, onChange}),
+    makeDropdown({options:statusOptions(), nouns:{all:'Усі статуси', some:'Статуси'},
+      set:f.statuses, onChange, cls:'dd-status'}));
+}
+
+function buildReaderFilters(){
+  const row = $('#filterRow');
+  row.innerHTML = '';
+  buildFilterDropdowns(row, filter, renderReader);
 }
 function toggleSet(set, v){ set.has(v) ? set.delete(v) : set.add(v); }
 
 function matchQ(cat, q){
   if(!filter.cats.has(cat.key)) return false;
   if(!filter.depths.has(q.depth)) return false;
-  if(filter.hideKnown && qstatus(qkey(cat,q))==='known') return false;
+  if(!filter.statuses.has(qstatus(qkey(cat,q)))) return false;
+  // Пошук інформації працює як ще один фільтр: лишаються питання, у тексті
+  // яких є запит (заголовок + еталон + повний розбір).
+  //
+  // ОХОПЛЕННЯ: поки що лише матеріали ВІДКРИТОГО рівня — DATA містить один
+  // рівень, і сторінка рівня самодостатня. Коли з'являться L1–L2, L4–L6, це
+  // треба розширити на всі курси: або збірка кладе поруч спільний індекс
+  // (рівень + категорія + питання + текст) і пошук ходить по ньому, або
+  // з'являється запит до бекенда. Тоді ж потрібен показ рівня в результатах —
+  // інакше «знайшлося у L4» буде не відрізнити від свого рівня.
   if(filter.search){
     const s = filter.search.toLowerCase();
     if(!(q.title.toLowerCase().includes(s) || q.md.toLowerCase().includes(s) ||
          (q.exam||'').toLowerCase().includes(s))) return false;
   }
   return true;
+}
+
+// Пошук: мінімум SEARCH_MIN символів (одна-дві літери є майже в кожному
+// питанні — фільтр не звужував би нічого, а перемальовував усе) і дебаунс,
+// щоб не перемальовувати список на кожну натиснуту клавішу.
+const SEARCH_MIN = 3;
+const SEARCH_DEBOUNCE_MS = 220;
+let searchTimer = null;
+
+// У сітці фільтрів на телефоні поле вузьке (пів рядка) — довгий плейсхолдер там
+// обрізається на півслові, тож підпис залежить від ширини, а не від смаку.
+const SEARCH_PH_WIDE = 'Пошук по матеріалах рівня (від 3 символів)…';
+const SEARCH_PH_NARROW = 'Пошук (3+)…';
+const narrowMQ = window.matchMedia('(max-width:560px)');
+function syncSearchPlaceholder(){
+  $('#search').placeholder = narrowMQ.matches ? SEARCH_PH_NARROW : SEARCH_PH_WIDE;
+}
+
+function onSearchInput(raw){
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(()=>{
+    const q = raw.length >= SEARCH_MIN ? raw : '';
+    if(q === filter.search) return; // ще нема 3 символів або текст той самий
+    filter.search = q;
+    renderReader();
+  }, SEARCH_DEBOUNCE_MS);
 }
 
 const STATUS_CYCLE = {new:'learning', learning:'known', known:'new'};
@@ -1054,7 +1330,10 @@ function renderReader(){
 /* ============================================================
    ФЛЕШ-КАРТКИ
    ============================================================ */
-let deckFilter = {cat:'all', depth:'all', onlyNew:false, shuffle:false};
+// Та сама форма, що й у filter читалки, — того самого компонента фільтрів.
+// Колода через це отримала мультивибір: раніше селекти давали «усі або одна».
+let deckFilter = {cats:new Set(DATA.categories.map(c=>c.key)), depths:new Set(DEPTH_ORDER),
+  statuses:new Set(STATUS_ORDER), shuffle:false};
 // revealed — показано еталон «🎯 Відповідь на іспиті» (мішень самоперевірки);
 // fullShown — додатково розгорнуто повний міні-урок (за кнопкою)
 let deck = [], deckIdx = 0, revealed = false, fullShown = false;
@@ -1062,32 +1341,7 @@ let deck = [], deckIdx = 0, revealed = false, fullShown = false;
 function buildDeckControls(){
   const c = $('#deckControls');
   c.innerHTML = '';
-  const catSel = document.createElement('select');
-  catSel.className = 'mini-btn';
-  catSel.innerHTML = '<option value="all">Усі категорії</option>'+
-    DATA.categories.map(x=>'<option value="'+x.key+'">'+x.name+'</option>').join('');
-  catSel.value = deckFilter.cat;
-  catSel.onchange = ()=>{ deckFilter.cat = catSel.value; rebuildDeck(); };
-
-  const depSel = document.createElement('select');
-  depSel.className = 'mini-btn';
-  depSel.innerHTML = '<option value="all">Усі рівні</option>'+
-    DEPTH_ORDER.map(d=>'<option value="'+d+'">'+DEPTH_LABEL[d]+'</option>').join('');
-  depSel.value = deckFilter.depth;
-  depSel.onchange = ()=>{ deckFilter.depth = depSel.value; rebuildDeck(); };
-
-  const onlyNew = document.createElement('button');
-  onlyNew.type = 'button';
-  onlyNew.className = 'chip chip-toggle' + (deckFilter.onlyNew ? ' on' : '');
-  onlyNew.style.margin = '0';
-  onlyNew.setAttribute('aria-pressed', deckFilter.onlyNew ? 'true' : 'false');
-  onlyNew.innerHTML = '<span class="chip-ic">'+ICONS['eye-off']+'</span> лише невивчені';
-  onlyNew.onclick = ()=>{
-    deckFilter.onlyNew = !deckFilter.onlyNew;
-    onlyNew.classList.toggle('on', deckFilter.onlyNew);
-    onlyNew.setAttribute('aria-pressed', deckFilter.onlyNew ? 'true' : 'false');
-    rebuildDeck();
-  };
+  buildFilterDropdowns(c, deckFilter, rebuildDeck);
 
   const shuffleBtn = document.createElement('button');
   shuffleBtn.className = 'mini-btn';
@@ -1099,16 +1353,16 @@ function buildDeckControls(){
   restartBtn.innerHTML = ICONS['rotate-ccw'] + ' спочатку';
   restartBtn.onclick = ()=>{ deckFilter.shuffle = false; rebuildDeck(); };
 
-  c.append(catSel, depSel, onlyNew, shuffleBtn, restartBtn);
+  c.append(shuffleBtn, restartBtn);
 }
 
 function rebuildDeck(){
   deck = [];
   DATA.categories.forEach(cat=>{
-    if(deckFilter.cat!=='all' && cat.key!==deckFilter.cat) return;
+    if(!deckFilter.cats.has(cat.key)) return;
     cat.questions.forEach(q=>{
-      if(deckFilter.depth!=='all' && q.depth!==deckFilter.depth) return;
-      if(deckFilter.onlyNew && qstatus(qkey(cat,q))==='known') return;
+      if(!deckFilter.depths.has(q.depth)) return;
+      if(!deckFilter.statuses.has(qstatus(qkey(cat,q)))) return;
       deck.push({cat, q, key:qkey(cat,q)});
     });
   });
@@ -1144,7 +1398,9 @@ function renderCard(){
     '<div class="card">'+
       '<div class="card-top">'+
         '<span class="pill" style="border-color:'+CAT_COLOR[cat.key]+';color:'+CAT_COLOR[cat.key]+'">'+cat.name+'</span>'+
-        '<span class="pill depth"><span class="dbadge '+q.depth+'"></span>'+DEPTH_LABEL[q.depth]+'</span>'+
+        // клас глибини і на самій пилюлі — щоб бордер був у тон крапки,
+        // як у пилюль категорії та статусу поруч
+        '<span class="pill depth '+q.depth+'"><span class="dbadge '+q.depth+'"></span>'+DEPTH_LABEL[q.depth]+'</span>'+
         (st==='known'?'<span class="pill" style="color:var(--good);border-color:var(--good)">✓ знаю</span>':'')+
       '</div>'+
       '<div class="card-q"><span style="font-family:var(--mono);font-size:.7em;color:var(--mute)">'+q.id+'&nbsp;&nbsp;</span>'+esc(q.title)+'</div>'+
@@ -1258,6 +1514,7 @@ function renderCheck(){
   });
   $('#chkDone').textContent = done;
   $('#chkTotal').textContent = total;
+  $('#chkBar').style.width = (total ? done/total*100 : 0)+'%';
   root.querySelectorAll('.chk-item').forEach(row=>{
     row.onclick = ()=>{
       const k = row.dataset.k;
@@ -1288,14 +1545,6 @@ function applyTheme(){
   $('#themeBtn').innerHTML = state.theme==='dark' ? ICONS.sun : ICONS.moon;
 }
 
-// синхронізує вигляд чипа-перемикача «приховати вивчені» зі станом filter.hideKnown
-function syncHideKnownChip(){
-  const b = $('#hideKnown');
-  if(!b) return;
-  b.classList.toggle('on', filter.hideKnown);
-  b.setAttribute('aria-pressed', filter.hideKnown ? 'true' : 'false');
-}
-
 function init(){
   paintIcons(); // заповнити всі статичні [data-icon] векторними SVG
   const total = DATA.totals.questions;
@@ -1303,7 +1552,7 @@ function init(){
   $('#cntCards').textContent = total;
   $('#cntCheck').textContent = DATA.checklist.reduce((a,c)=>a+c.items.length,0);
 
-  buildChips();
+  buildReaderFilters();
   buildDeckControls();
   renderReader();
   renderCheck();
@@ -1316,10 +1565,22 @@ function init(){
     if(tb) document.documentElement.style.setProperty('--stick-top', tb.offsetHeight+'px');
   };
   syncStickTop();
-  window.addEventListener('resize', syncStickTop);
+  syncSearchPlaceholder();
 
-  $('#search').oninput = e=>{ filter.search = e.target.value.trim(); renderReader(); };
-  $('#hideKnown').onclick = ()=>{ filter.hideKnown = !filter.hideKnown; syncHideKnownChip(); renderReader(); };
+  // Кнопка «вгору» — лише коли гортати вгору справді далеко (понад екран із
+  // чвертю). На коротких сторінках (порожня колода, вузька вибірка) не з'явиться.
+  const toTop = $('#toTopBtn');
+  const syncToTop = ()=> toTop.classList.toggle('show', window.scrollY > window.innerHeight * 1.25);
+  toTop.onclick = ()=> window.scrollTo({top:0, behavior:'smooth'});
+  syncToTop();
+
+  // поворот екрана / зміна вікна робить замір вирівнювання панелі несправжнім —
+  // простіше закрити її, ніж переміряти на льоту
+  window.addEventListener('resize', ()=>{
+    syncStickTop(); syncSearchPlaceholder(); closeDropdown(); syncToTop();
+  });
+
+  $('#search').oninput = e=>onSearchInput(e.target.value.trim());
   document.querySelectorAll('.tab').forEach(t=>t.onclick = ()=>switchTab(t.dataset.tab));
   $('#themeBtn').onclick = ()=>{ state.theme = state.theme==='dark'?'light':'dark'; applyTheme(); save(); };
   $('#logoutBtn').onclick = async ()=>{
@@ -1352,9 +1613,24 @@ function init(){
     $('#srcOverlay').onclick = e=>{ if(e.target === $('#srcOverlay')) closeSource(); };
   }
 
+  // клік будь-де поза відкритою панеллю фільтра її закриває (тригер і панель
+  // самі гасять подію, тож їхні кліки сюди не доходять)
+  document.addEventListener('click', closeDropdown);
+
+  // Відчутний скрол сторінки закриває панель: рядок фільтрів не липкий, тож
+  // інакше вона з'їжджала б під топбар і висіла обрізаною. Поріг у 40px — щоб
+  // не ловити автокорекцію scrollY, коли перемальований коротший список
+  // «підтягує» сторінку вгору (це не жест користувача). Скрол ВСЕРЕДИНІ панелі
+  // сюди не доходить: подія scroll елемента не спливає.
+  window.addEventListener('scroll', ()=>{
+    if(ddOpen && Math.abs(window.scrollY - ddOpenScrollY) > 40) closeDropdown();
+    syncToTop();
+  }, {passive:true});
+
   document.addEventListener('keydown', e=>{
+    if(e.key==='Escape' && ddOpen){ closeDropdown(); return; }
     if(e.key==='Escape' && !$('#srcOverlay').hidden){ closeSource(); return; }
-    if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA') return;
+    if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
     if(state.tab==='cards'){
       // Space: спершу розкриває еталон, повторне натискання — повний розбір
       if(e.code==='Space'){ const b=$('#revealBtn')||$('#fullBtn'); if(b){ e.preventDefault(); b.click(); } }
