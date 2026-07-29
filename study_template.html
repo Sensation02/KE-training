@@ -35,8 +35,15 @@ PWA_HEAD_PLACEHOLDER
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
+/* overflow-x:clip — остання лінія оборони від «зуму» на iOS. Якщо якийсь елемент
+   усе ж виявиться ширшим за екран, Safari розтягує layout viewport до нього й
+   показує сторінку зменшеною; далі фокус будь-якого поля повертає масштаб до
+   100%, і сторінка стрибком «зумиться» та обрізається праворуч. З clip зайва
+   ширина просто відрізається, а масштаб лишається 100% від самого початку.
+   clip, а не hidden: не створює контейнер прокрутки, тож sticky-шапка й липкі
+   кнопки колоди працюють як раніше. */
 body{font-family:var(--font);background:var(--bg);color:var(--text);
-  line-height:1.55;-webkit-font-smoothing:antialiased;
+  line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:clip;
   transition:background .25s,color .25s}
 ::selection{background:var(--accent-soft)}
 
@@ -105,9 +112,18 @@ body.src-open .to-top,body.session-open .to-top{opacity:0;pointer-events:none}
 /* ============ Вкладки ============ */
 .tabs{display:flex;gap:6px;padding:5px;background:var(--panel);border:1px solid var(--border);
   border-radius:14px;margin-bottom:22px;box-shadow:var(--shadow)}
-.tab{flex:1;padding:11px 8px;border:none;background:none;color:var(--dim);cursor:pointer;
+/* min-width:0 — не косметика: flex-елемент за замовчуванням не стискається
+   вужче за свій min-content, тож три вкладки разом задавали сторінці мінімальну
+   ширину. Якщо вона більша за екран, iOS розтягує layout viewport до неї й
+   показує сторінку зменшеною — а фокус будь-якого поля повертає масштаб до
+   100%, і це виглядає як зум на тапі по пошуку. */
+.tab{flex:1;min-width:0;padding:11px 8px;border:none;background:none;color:var(--dim);cursor:pointer;
   border-radius:10px;font-family:var(--font);font-size:14px;font-weight:600;
   display:flex;align-items:center;justify-content:center;gap:8px;transition:.16s}
+/* «Флеш-картки» переносяться по дефісу, але покладатись на це не можна:
+   де який рушій ставить перенос — питання локалі й версії, а ціна помилки —
+   розтягнутий viewport. anywhere дозволяє розрив у будь-якому місці слова. */
+.tab-txt{min-width:0;overflow-wrap:anywhere}
 .tab:hover{color:var(--text)}
 .tab.active{background:var(--accent);color:#fff;box-shadow:0 4px 14px var(--accent-soft)}
 .tab .cnt{font-family:var(--mono);font-size:11px;opacity:.85;
@@ -121,16 +137,19 @@ body.src-open .to-top,body.session-open .to-top{opacity:0;pointer-events:none}
 /* один рядок: дропдауни ліворуч, пошук притиснутий до протилежного краю
    (margin-left:auto). На вужчих екранах пошук переноситься нижче сам */
 .filters{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
-.filters .search-wrap{margin-left:auto;flex:1 1 240px;max-width:400px}
-.search{width:100%;height:var(--ctl-h);padding:0 14px;border-radius:10px;border:1px solid var(--border);
-  background:var(--panel);color:var(--text);font-family:var(--font);font-size:13px;outline:none;transition:.16s}
+.filters .search-wrap{margin-left:auto;flex:1 1 240px;max-width:400px;min-width:0}
+/* 16px за замовчуванням — не косметика: за меншого шрифту iOS зумить сторінку на
+   фокусі поля. Дрібніший шрифт лишаємо ЛИШЕ там, де впевнено є мишка: якщо
+   визначення не спрацює, отримаємо 16px і без зуму, а не навпаки (тач-екран, що
+   відповів pointer:fine — наприклад планшет із трекпадом — інакше зумив би). */
+/* min-width:0 — у <input> є власна інтринсик-ширина (≈20 символів), і як
+   flex/grid-елемент він не стискається вужче за неї. Разом із 16px шрифту це
+   ~207px мінімуму, який тягнув за собою всю сторінку (див. .tab). */
+.search{width:100%;min-width:0;height:var(--ctl-h);padding:0 14px;border-radius:10px;border:1px solid var(--border);
+  background:var(--panel);color:var(--text);font-family:var(--font);font-size:16px;outline:none;transition:.16s}
+@media (hover:hover) and (pointer:fine){.search{font-size:13px}}
 .search:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .search::placeholder{color:var(--mute)}
-/* 16px — не косметика: за меншого шрифту iOS зумить сторінку на фокусі поля,
-   і далі вся сторінка лишається збільшеною. Прив'язка до типу вказівника, а не
-   до ширини: телефон в альбомі й планшет ширші за будь-який «мобільний»
-   брейкпоінт, а зумить їх так само. */
-@media (pointer:coarse){.search{font-size:16px}}
 .dd-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .dot{width:9px;height:9px;border-radius:50%;flex:none}
 .dot.deep{background:var(--deep)} .dot.mid{background:var(--mid)} .dot.aware{background:var(--aware)}
@@ -138,10 +157,14 @@ body.src-open .to-top,body.session-open .to-top{opacity:0;pointer-events:none}
 .dot.st-new{background:var(--mute)} .dot.st-learning{background:var(--warn)} .dot.st-known{background:var(--good)}
 
 /* мультивибірний дропдаун (категорії / рівні / статус — і в читалці, і в колоді) */
-.dd{position:relative}
+.dd{position:relative;min-width:0}
 .dd-trigger{display:inline-flex;align-items:center;gap:9px;height:var(--ctl-h);padding:0 12px;
+  min-width:0;max-width:100%;
   border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--text);
   cursor:pointer;font-family:var(--font);font-size:12.5px;font-weight:500;line-height:1;transition:.14s}
+/* висота тригера фіксована (--ctl-h), тож переносити підпис нікуди — на вузькому
+   екрані він обрізається трьома точками, а не розсуває контрол за межі екрана */
+.dd-label{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .dd-trigger:hover{border-color:var(--accent)}
 .dd.open .dd-trigger{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .dd-chev{display:inline-flex;color:var(--mute);transition:transform .16s}
@@ -266,7 +289,7 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 .deck-actions{display:flex;gap:12px;width:100%;margin-top:auto;
   position:sticky;bottom:0;background:var(--card);padding:16px 0 14px;
   box-shadow:0 -14px 18px -6px var(--card)}
-.btn{flex:1;padding:14px;border-radius:13px;border:1px solid var(--border);background:var(--panel);
+.btn{flex:1;min-width:0;padding:14px;border-radius:13px;border:1px solid var(--border);background:var(--panel);
   color:var(--text);font-family:var(--font);font-size:14.5px;font-weight:600;cursor:pointer;transition:.14s;
   display:flex;align-items:center;justify-content:center;gap:9px}
 .btn:hover{transform:translateY(-1px)}
@@ -281,6 +304,7 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
    рядку (колода), або є єдиним контролом свого блоку (чеклист, картка) —
    і в обох випадках 27px були і дрібними на вигляд, і замалими для тапу */
 .mini-btn{font-family:var(--mono);font-size:11px;height:var(--ctl-h);padding:0 12px;border-radius:10px;
+  min-width:0;max-width:100%;
   border:1px solid var(--border);background:var(--panel);color:var(--dim);cursor:pointer;transition:.14s}
 .mini-btn:hover{color:var(--text);border-color:var(--accent)}
 
@@ -373,7 +397,9 @@ body.src-open{overflow:hidden}
 .md a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-soft)}
 .md a:hover{border-bottom-color:var(--accent)}
 .md code{font-family:var(--mono);font-size:.86em;background:var(--code-bg);color:#e6b3ff;
-  padding:2px 6px;border-radius:6px;border:1px solid var(--code-line)}
+  padding:2px 6px;border-radius:6px;border:1px solid var(--code-line);overflow-wrap:anywhere}
+/* у блоці — лишається скрол (.md pre{overflow-x:auto}), рядки коду не рвемо */
+.md pre code{overflow-wrap:normal}
 .md ul,.md ol{padding-left:22px} .md li{margin-bottom:5px}
 .md ul ul,.md ol ol,.md ul ol,.md ol ul{margin-top:5px;margin-bottom:0}
 .md blockquote{border-left:3px solid var(--accent);padding:4px 0 4px 15px;color:var(--dim);
@@ -470,6 +496,14 @@ body.src-open{overflow:hidden}
   .src-sec>summary{padding:14px 12px}
   .src-item{padding:11px 12px}
   .session-banner{max-width:calc(100vw - 14px)}
+}
+
+/* екрани SE-класу: три вкладки в рядку — найтісніше місце сторінки. Трохи
+   дрібніший підпис і щільніші відступи, щоб слова вкладались цілими: розрив
+   усередині слова (.tab-txt) лишається аварійним запобіжником, а не нормою */
+@media (max-width:370px){
+  .tab{font-size:13px;padding:13px 4px;gap:5px}
+  .tab .tab-ic svg{width:15px;height:15px}
 }
 </style>
 </head>
@@ -1239,12 +1273,37 @@ let searchTimer = null;
 // чому набране одне-два не фільтрує нічого.
 const SEARCH_PH_WIDE = `Пошук по матеріалах рівня (від ${SEARCH_MIN} символів)…`;
 const SEARCH_PH_NARROW = `Пошук: від ${SEARCH_MIN} символів…`;
-// Короткий підпис потрібен у двох випадках: телефон (поле — рядок сітки) і будь-який
-// тач-екран (там шрифт поля 16px проти зуму, і довгий текст уже не влазить у 400px
-// поля навіть на планшеті). Тому умова — ширина АБО тип вказівника.
-const shortPhMQ = window.matchMedia('(max-width:560px), (pointer:coarse)');
+// Короткий підпис потрібен у двох випадках: телефон (поле — рядок сітки) і всюди,
+// де поле має 16-піксельний шрифт проти зуму, — з ним довгий текст не влазить у
+// 400px поля навіть на планшеті. Умови дзеркалять CSS: 13px лишається тільки під
+// мишкою, тож усе інше — короткий підпис.
+const narrowMQ = window.matchMedia('(max-width:560px)');
+const mouseMQ = window.matchMedia('(hover:hover) and (pointer:fine)');
 function syncSearchPlaceholder(){
-  $('#search').placeholder = shortPhMQ.matches ? SEARCH_PH_NARROW : SEARCH_PH_WIDE;
+  const short = narrowMQ.matches || !mouseMQ.matches;
+  $('#search').placeholder = short ? SEARCH_PH_NARROW : SEARCH_PH_WIDE;
+}
+
+// 16px шрифту поля мало не завжди: iOS міряє його проти власного «розбірливого»
+// розміру, а той росте разом із системним Розміром тексту — на такому телефоні
+// сторінка зумиться і з 16px, і назад сама не повертається. Тому на час фокусу
+// поля додаємо до viewport maximum-scale=1: він забороняє саме АВТОМАТИЧНИЙ зум.
+// Пінч-зум лишається — Safari з iOS 10 ігнорує maximum-scale для жестів людини,
+// а поза фокусом мета взагалі вихідна. Обмежено WebKit-ом на тачі: у Chrome для
+// Android автозуму немає, а maximum-scale там жести таки ріже.
+function armSearchZoomGuard(){
+  const meta = document.querySelector('meta[name=viewport]');
+  const webkitTouch = /^Apple/.test(navigator.vendor || '') && navigator.maxTouchPoints > 0;
+  if(!meta || !webkitTouch) return;
+  const base = meta.content;
+  const input = $('#search');
+  // touchstart, а не focus: до моменту фокуса Safari уже вирішив, чи зумити,
+  // тож мету треба підмінити ще на дотику. focus — для клавіатурного/іншого
+  // шляху до поля (наприклад із зовнішньої клавіатури на планшеті).
+  const lock = ()=>{ meta.content = base + ',maximum-scale=1'; };
+  input.addEventListener('touchstart', lock, {passive:true});
+  input.addEventListener('focus', lock);
+  input.addEventListener('blur', ()=>{ meta.content = base; });
 }
 
 function onSearchInput(raw){
@@ -1593,6 +1652,7 @@ function init(){
   });
 
   $('#search').oninput = e=>onSearchInput(e.target.value.trim());
+  armSearchZoomGuard();
   document.querySelectorAll('.tab').forEach(t=>t.onclick = ()=>switchTab(t.dataset.tab));
   $('#themeBtn').onclick = ()=>{ state.theme = state.theme==='dark'?'light':'dark'; applyTheme(); save(); };
   $('#logoutBtn').onclick = async ()=>{
