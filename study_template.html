@@ -126,6 +126,11 @@ body.src-open .to-top,body.session-open .to-top{opacity:0;pointer-events:none}
   background:var(--panel);color:var(--text);font-family:var(--font);font-size:13px;outline:none;transition:.16s}
 .search:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .search::placeholder{color:var(--mute)}
+/* 16px — не косметика: за меншого шрифту iOS зумить сторінку на фокусі поля,
+   і далі вся сторінка лишається збільшеною. Прив'язка до типу вказівника, а не
+   до ширини: телефон в альбомі й планшет ширші за будь-який «мобільний»
+   брейкпоінт, а зумить їх так само. */
+@media (pointer:coarse){.search{font-size:16px}}
 .dd-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .dot{width:9px;height:9px;border-radius:50%;flex:none}
 .dot.deep{background:var(--deep)} .dot.mid{background:var(--mid)} .dot.aware{background:var(--aware)}
@@ -416,6 +421,10 @@ body.src-open{overflow:hidden}
      дропдауни і пошук вирівняні по одних і тих самих колонках. */
   .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
   #filterRow{display:contents}
+  /* Статус і пошук — на всю ширину рядка (те саме рішення, що для .dd-status у
+     колоді). У півклітинці в поле пошуку вміщався тільки скорочений підпис —
+     звідси й було незрозуміле «3+»; на цілий рядок влазить нормальний. */
+  .filters .dd-status,.filters .search-wrap{grid-column:span 2}
   .filters .search-wrap{margin-left:0;max-width:none}
   /* колода: три фільтри займають два перші рядки (третій — на всю ширину),
      дві дії лишаються разом в останньому. Інакше «перемішати» стоїть у колонці
@@ -425,8 +434,6 @@ body.src-open{overflow:hidden}
   .dd,.dd-trigger,.deck-controls .mini-btn{width:100%}
   .dd-trigger{padding:0 13px;font-size:13.5px;justify-content:space-between}
   .dd-opt{padding:11px 10px;font-size:14px}
-  /* 16px — не косметика: за меншого шрифту iOS зумить сторінку на фокусі поля */
-  .search{font-size:16px}
   .topbar{padding:16px 0 14px;gap:10px}
   .brand{flex:1 1 100%;order:1}
   .nav-back{order:2}
@@ -1226,13 +1233,18 @@ const SEARCH_MIN = 3;
 const SEARCH_DEBOUNCE_MS = 220;
 let searchTimer = null;
 
-// У сітці фільтрів на телефоні поле вузьке (пів рядка) — довгий плейсхолдер там
-// обрізається на півслові, тож підпис залежить від ширини, а не від смаку.
-const SEARCH_PH_WIDE = 'Пошук по матеріалах рівня (від 3 символів)…';
-const SEARCH_PH_NARROW = 'Пошук (3+)…';
-const narrowMQ = window.matchMedia('(max-width:560px)');
+// На телефоні поле займає рядок сітки фільтрів, а не всю ширину контенту —
+// довгий підпис там обрізається на півслові, тож він залежить від ширини, а не
+// від смаку. Умову «від 3 символів» несуть обидва варіанти: без неї незрозуміло,
+// чому набране одне-два не фільтрує нічого.
+const SEARCH_PH_WIDE = `Пошук по матеріалах рівня (від ${SEARCH_MIN} символів)…`;
+const SEARCH_PH_NARROW = `Пошук: від ${SEARCH_MIN} символів…`;
+// Короткий підпис потрібен у двох випадках: телефон (поле — рядок сітки) і будь-який
+// тач-екран (там шрифт поля 16px проти зуму, і довгий текст уже не влазить у 400px
+// поля навіть на планшеті). Тому умова — ширина АБО тип вказівника.
+const shortPhMQ = window.matchMedia('(max-width:560px), (pointer:coarse)');
 function syncSearchPlaceholder(){
-  $('#search').placeholder = narrowMQ.matches ? SEARCH_PH_NARROW : SEARCH_PH_WIDE;
+  $('#search').placeholder = shortPhMQ.matches ? SEARCH_PH_NARROW : SEARCH_PH_WIDE;
 }
 
 function onSearchInput(raw){
