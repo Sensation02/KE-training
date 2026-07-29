@@ -44,6 +44,21 @@ EXAM_RE = re.compile(r"^\*\*🎯 Відповідь на іспиті:\*\*\s*(.+
 # а не мовчазний пропуск.
 CHECKLIST_ITEM_RE = re.compile(r"^- \[[ xX]\] (🟣|🔵|🟢)\s*(.*)$")
 
+# необов'язкова тека з вихідним документом рівня (матриця компетенцій, з якої
+# зроблено матеріали). Рівень без неї збирається як раніше.
+SOURCE_DIR_NAME = "source"
+
+# секція джерела: '## B · Front-End' (літера колонки в оригінальній таблиці · назва)
+SOURCE_SECTION_RE = re.compile(r"^## ([A-Z]+) · (.+)$")
+
+# пункт джерела: '- `B15` 🟩 текст'. Адреса клітинки — щоб пункт можна було
+# звірити з .xlsx; емодзі — мітка заливки в оригіналі.
+SOURCE_ITEM_RE = re.compile(r"^- `([A-Z]+\d+)` (🟩|🟨|🟥|⬜) (.+)$")
+
+# емодзі-мітка заливки → код для шаблону. Кольори джерела не тлумачаться:
+# офіційної легенди в книзі немає (див. спеку матриці).
+MARKS = {"🟩": "green", "🟨": "yellow", "🟥": "red", "⬜": "plain"}
+
 # посилання пункту чеклиста на питання, що його покривають:
 # '<!-- q:front-end/Q1 -->' або кілька через кому '<!-- q:front-end/Q1, back-end/Q3 -->'.
 # HTML-коментар — щоб у звичайному перегляді .md посилання не було видно.
@@ -187,6 +202,66 @@ def validate_checklist_lines(text, checklist_path, level_name):
     return errors
 
 
+def parse_source(text, source_path, level_name):
+    """Вихідний документ рівня → (дані для шаблону, errors).
+
+    Формат — секція на категорію ('## B · Front-End') і пункти
+    ('- `B15` 🟩 текст'). Порожня секція, невідома мітка або рядок, схожий
+    на пункт, але не зматчений SOURCE_ITEM_RE, — це помилка збірки, а не
+    мовчазний пропуск: тихо загублений шматок джерела ніхто не помітить,
+    бо звіряти рендер із .xlsx вручну ніхто не буде.
+    """
+    meta, body = parse_frontmatter(text)
+    errors = []
+    sections = []
+    cur = None
+    for lineno, line in enumerate(body.splitlines(), start=1):
+        h = SOURCE_SECTION_RE.match(line)
+        if h:
+            cur = {"col": h.group(1), "name": h.group(2).strip(), "items": []}
+            sections.append(cur)
+            continue
+        it = SOURCE_ITEM_RE.match(line)
+        if it:
+            if cur is None:
+                errors.append(
+                    f"[{level_name}/{source_path.name}:{lineno}] пункт "
+                    f"{it.group(1)} поза будь-якою секцією '## <Літера> · <Назва>'"
+                )
+                continue
+            cur["items"].append(
+                {
+                    "ref": it.group(1),
+                    "mark": MARKS[it.group(2)],
+                    "text": it.group(3).strip(),
+                }
+            )
+            continue
+        if line.startswith("- `"):
+            errors.append(
+                f"[{level_name}/{source_path.name}:{lineno}] рядок схожий на "
+                f"пункт джерела, але не відповідає формату "
+                f"'- `B15` 🟩|🟨|🟥|⬜ текст' (парсер його мовчки пропустив би): "
+                f"{line.strip()[:80]!r}"
+            )
+    for s in sections:
+        if not s["items"]:
+            errors.append(
+                f"[{level_name}/{source_path.name}] секція "
+                f"'{s['col']} · {s['name']}' не містить жодного пункту"
+            )
+    if not sections:
+        errors.append(
+            f"[{level_name}/{source_path.name}] джерело не містить жодної "
+            f"секції '## <Літера> · <Назва>'"
+        )
+        return None, errors
+    return {
+        "title": meta.get("title") or source_path.stem,
+        "sections": [s for s in sections if s["items"]],
+    }, errors
+
+
 def discover_levels():
     """Піддиректорії levels/*/, відсортовані за іменем."""
     if not LEVELS_DIR.is_dir():
@@ -207,6 +282,25 @@ def section_files(level_dir):
 def checklist_file(level_dir):
     """Рівно один файл *_Checklist.md у директорії рівня."""
     return sorted(level_dir.glob("*_Checklist.md"))
+
+
+def source_summary(data):
+    """Хвіст рядка звіту про джерело рівня ('' — якщо теки source/ немає).
+
+    Без нього тихо непрочитане джерело виглядало б у виводі так само,
+    як його відсутність.
+    """
+    src = data.get("source")
+    if not src:
+        return ""
+    items = sum(len(s["items"]) for s in src["sections"])
+    return f" · джерело: {items} пунктів у {len(src['sections'])} категоріях"
+
+
+def source_files(level_dir):
+    """Файли *.md у необов'язковій теці source/ рівня."""
+    src = level_dir / SOURCE_DIR_NAME
+    return sorted(src.glob("*.md")) if src.is_dir() else []
 
 
 def strip_prefix(fname):
@@ -247,7 +341,10 @@ def collect_level_data(level_dir, errors, warnings):
          (той самий регекс, що й у parse_checklist);
       5. рівень сумарно має ≥1 питання;
       6. посилання пунктів чеклиста на питання (<!-- q:... -->) резолвляться
-         (битий реф — error; прогалини покриття йдуть у warnings).
+         (битий реф — error; прогалини покриття йдуть у warnings);
+      7. якщо є тека source/ — у ній не більше одного *.md, і той відповідає
+         формату вихідного документа (секції '## <Літера> · <Назва>' з пунктами
+         '- `B15` 🟩 текст'). Теки може не бути зовсім.
 
     Повертає дані рівня (для рендеру HTML), або None, якщо рівень
     настільки зламаний (немає розділів і/або чеклиста), що дані зібрати
@@ -326,9 +423,27 @@ def collect_level_data(level_dir, errors, warnings):
     if total_q == 0:
         errors.append(f"[{level_name}] рівень не містить жодного питання")
 
+    # вихідний документ рівня — необов'язковий: рівень без теки source/
+    # збирається як раніше (інакше майбутні L2/L4 не зберуться, поки їм
+    # не знайдуть матрицю).
+    sources = source_files(level_dir)
+    source = None
+    if len(sources) > 1:
+        errors.append(
+            f"[{level_name}] у {level_dir / SOURCE_DIR_NAME} очікувався "
+            f"щонайбільше 1 файл *.md, знайдено {len(sources)}: "
+            f"{', '.join(p.name for p in sources)}"
+        )
+    elif sources:
+        source, source_errors = parse_source(
+            sources[0].read_text(encoding="utf-8"), sources[0], level_name
+        )
+        errors.extend(source_errors)
+
     return {
         "categories": categories,
         "checklist": checklist,
+        "source": source,
         "totals": {"questions": total_q, "depth": depth_counts},
     }
 
@@ -531,7 +646,7 @@ def run_pipeline(check_only):
             print(
                 f"OK -> {level_dir.name}: {d['questions']} питань "
                 f"(deep {d['depth']['deep']} · mid {d['depth']['mid']} · aware {d['depth']['aware']}) · "
-                f"{checklist_items} пунктів чеклиста"
+                f"{checklist_items} пунктів чеклиста{source_summary(data)}"
             )
         print(f"CHECK OK · {len(level_data)} рівень(-ні/-ів) пройшли валідацію (dist/ не змінено)")
         return
@@ -560,7 +675,7 @@ def run_pipeline(check_only):
         print(
             f"OK -> dist/{level_key}/index.html · {d['questions']} питань "
             f"(deep {d['depth']['deep']} · mid {d['depth']['mid']} · aware {d['depth']['aware']}) · "
-            f"{checklist_items} пунктів чеклиста"
+            f"{checklist_items} пунктів чеклиста{source_summary(data)}"
         )
 
     (DIST_DIR / "index.html").write_text(
