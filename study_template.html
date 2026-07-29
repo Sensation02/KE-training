@@ -198,6 +198,56 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
 .chk-text{flex:1;font-size:14px}
 .chk-text .dbadge{display:inline-block;margin:0 8px 0 0;vertical-align:middle}
 .chk-refs{margin-top:7px;display:flex;gap:6px;flex-wrap:wrap}
+
+/* ============ Джерело: рядок входу + оверлей ============ */
+.src-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px;
+  padding:12px 15px;border:1px solid var(--border);border-radius:12px;
+  background:var(--card);font-size:12.5px;color:var(--dim)}
+.src-bar b{color:var(--text);font-weight:600}
+.src-bar .mini-btn{margin-left:auto}
+/* Затемнення на всю площу. Ховається через hidden — без нього оверлей
+   лишався б у потоці й перехоплював кліки. */
+.src-ov{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
+  padding:24px;background:rgba(6,8,12,.72);backdrop-filter:blur(3px)}
+.src-ov[hidden]{display:none}
+.src-panel{display:flex;flex-direction:column;width:min(860px,100%);max-height:min(86vh,860px);
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);overflow:hidden}
+.src-head{display:flex;align-items:flex-start;gap:14px;padding:17px 19px;
+  border-bottom:1px solid var(--border)}
+.src-head h2{font-size:16px;font-weight:650;line-height:1.35}
+.src-head .src-sub{margin-top:4px;font-size:11.5px;color:var(--mute);font-family:var(--mono)}
+.src-close{flex:none;width:34px;height:34px;border-radius:9px;border:1px solid var(--border);
+  background:none;color:var(--dim);font-size:16px;cursor:pointer;transition:.14s}
+.src-close:hover{color:var(--text);border-color:var(--accent)}
+.src-legend{display:flex;gap:14px;flex-wrap:wrap;padding:12px 19px;
+  border-bottom:1px solid var(--border-soft);font-size:11.5px;color:var(--mute)}
+.src-body{overflow-y:auto;padding:15px 19px 22px;-webkit-overflow-scrolling:touch}
+.src-sec{margin-bottom:10px;border:1px solid var(--border);border-radius:12px;
+  background:var(--card);overflow:hidden}
+.src-sec>summary{display:flex;align-items:center;gap:11px;padding:13px 15px;cursor:pointer;
+  font-size:14px;font-weight:600;list-style:none;transition:.12s}
+.src-sec>summary::-webkit-details-marker{display:none}
+.src-sec>summary:hover{background:var(--card-hi)}
+.src-sec>summary::before{content:'▸';flex:none;color:var(--mute);font-size:11px;transition:transform .15s}
+.src-sec[open]>summary::before{transform:rotate(90deg)}
+.src-col{flex:none;font-family:var(--mono);font-size:10.5px;color:var(--mute);
+  padding:2px 7px;border-radius:6px;background:var(--card-hi)}
+.src-cnt{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--mute)}
+.src-item{display:flex;align-items:flex-start;gap:10px;padding:10px 15px;
+  border-top:1px solid var(--border-soft);font-size:13.5px}
+.src-ref{flex:none;font-family:var(--mono);font-size:10.5px;color:var(--mute);margin-top:2px;
+  min-width:38px}
+/* Мітки повторюють пастель оригіналу, щоб звірка з .xlsx була очевидною.
+   На 9px такі кольори між собою не розрізняються, тому 13px і темний
+   контур — він же тримає межу світлої плитки на світлій темі. */
+.src-mark{flex:none;width:13px;height:13px;border-radius:4px;margin-top:3px;
+  border:1px solid rgba(0,0,0,.35)}
+.src-mark.green{background:#d9ead3} .src-mark.yellow{background:#fff2cc}
+.src-mark.red{background:#f4cccc}
+.src-mark.plain{background:transparent;border:1px dashed var(--border)}
+.src-legend .src-mark{margin-top:0;vertical-align:-2px;display:inline-block}
+body.src-open{overflow:hidden}
 .qref{font-family:var(--mono);font-size:10.5px;padding:3px 9px;border-radius:20px;
   border:1px solid var(--border);background:var(--panel);color:var(--mute);cursor:pointer;
   transition:.14s;line-height:1.5}
@@ -260,6 +310,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
   .q-head{padding:12px 12px}
   .answer{padding:2px 12px 18px 12px}
   .chk-item{padding:12px 12px}
+  .src-ov{padding:0}
+  .src-panel{max-height:100vh;height:100%;border:none;border-radius:0}
+  .src-head,.src-legend,.src-body{padding-left:14px;padding-right:14px}
+  .src-close{width:44px;height:44px}
+  .src-sec>summary{padding:14px 12px}
+  .src-item{padding:11px 12px}
   .session-banner{max-width:calc(100vw - 14px)}
 }
 </style>
@@ -322,11 +378,35 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);
       <span><span class="dbadge aware"></span> Поверхнево</span>
       <span style="margin-left:auto"><b id="chkDone">0</b> / <span id="chkTotal">0</span> виконано</span>
     </div>
+    <div class="src-bar" id="srcBar" hidden>
+      <span>Джерело: <b id="srcBarName"></b></span>
+      <button class="mini-btn" id="srcOpenBtn">переглянути</button>
+    </div>
     <div id="checkList"></div>
   </section>
 
   <div class="footer">згенеровано з навчальних .md
     · <a href="#" id="resetBtn" style="color:var(--mute)">скинути прогрес</a></div>
+</div>
+
+<!-- ДЖЕРЕЛО: вихідна матриця компетенцій -->
+<div class="src-ov" id="srcOverlay" role="dialog" aria-modal="true" aria-labelledby="srcTitle" hidden>
+  <div class="src-panel">
+    <div class="src-head">
+      <div>
+        <h2 id="srcTitle"></h2>
+        <div class="src-sub">вихідний документ, з якого зроблено матеріали</div>
+      </div>
+      <button class="src-close" id="srcCloseBtn" title="Закрити" aria-label="Закрити">✕</button>
+    </div>
+    <div class="src-legend">
+      <span><span class="src-mark green"></span> зелена заливка</span>
+      <span><span class="src-mark yellow"></span> жовта</span>
+      <span><span class="src-mark red"></span> рожева</span>
+      <span><span class="src-mark plain"></span> без заливки</span>
+    </div>
+    <div class="src-body" id="srcBody"></div>
+  </div>
 </div>
 
 <div class="session-banner" id="sessionBanner">
@@ -980,6 +1060,50 @@ function renderCard(){
    ЧЕКЛИСТ
    ============================================================ */
 function chkKey(ci, ii){ return ci+':'+ii; }
+/* ============ Джерело (вихідна матриця компетенцій) ============ */
+// Малюється один раз, при першому відкритті: 189 вузлів немає сенсу
+// будувати на старті, якщо оверлей можуть жодного разу не відкрити.
+let srcRendered = false;
+let srcReturnFocus = null;
+
+function renderSource(){
+  if(srcRendered || !DATA.source) return;
+  $('#srcBody').innerHTML = DATA.source.sections.map(sec=>
+    '<details class="src-sec">'+
+      '<summary><span class="src-col">'+esc(sec.col)+'</span>'+esc(sec.name)+
+        '<span class="src-cnt">'+sec.items.length+'</span></summary>'+
+      sec.items.map(it=>
+        '<div class="src-item">'+
+          // пробіли між span'ами навмисні: без них копіювання пункту
+          // зі сторінки дає склеєне «B2Вміє…»
+          '<span class="src-ref">'+esc(it.ref)+'</span> '+
+          '<span class="src-mark '+esc(it.mark)+'"></span> '+
+          '<span>'+esc(it.text)+'</span>'+
+        '</div>').join('')+
+    '</details>').join('');
+  srcRendered = true;
+}
+
+function openSource(){
+  if(!DATA.source) return;
+  renderSource();
+  // саме кнопка входу, а не activeElement: у Safari клік мишею не фокусує
+  // кнопку, і фокус повертався б на <body>
+  srcReturnFocus = $('#srcOpenBtn');
+  $('#srcOverlay').hidden = false;
+  document.body.classList.add('src-open');
+  $('#srcCloseBtn').focus();
+}
+
+function closeSource(){
+  $('#srcOverlay').hidden = true;
+  document.body.classList.remove('src-open');
+  // повертаємо фокус туди, звідки відкрили, — інакше після Escape
+  // фокус залишиться на <body> і клавіатурна навігація почнеться згори
+  if(srcReturnFocus && srcReturnFocus.focus) srcReturnFocus.focus();
+  srcReturnFocus = null;
+}
+
 function renderCheck(){
   const root = $('#checkList');
   root.innerHTML = '';
@@ -1090,7 +1214,19 @@ function init(){
       saveProgress(); renderReader(); renderCheck(); refreshProgress(); rebuildDeck();
     }
   };
+  // джерело: рядок входу у чеклисті з'являється, лише якщо рівень має source/
+  if(DATA.source){
+    $('#srcBarName').textContent = DATA.source.title;
+    $('#srcTitle').textContent = DATA.source.title;
+    $('#srcBar').hidden = false;
+    $('#srcOpenBtn').onclick = openSource;
+    $('#srcCloseBtn').onclick = closeSource;
+    // клік по затемненню (а не по панелі всередині нього) закриває оверлей
+    $('#srcOverlay').onclick = e=>{ if(e.target === $('#srcOverlay')) closeSource(); };
+  }
+
   document.addEventListener('keydown', e=>{
+    if(e.key==='Escape' && !$('#srcOverlay').hidden){ closeSource(); return; }
     if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA') return;
     if(state.tab==='cards'){
       // Space: спершу розкриває еталон, повторне натискання — повний розбір
