@@ -122,15 +122,15 @@ body.src-open .to-top,body.session-open .to-top{opacity:0;pointer-events:none}
    (margin-left:auto). На вужчих екранах пошук переноситься нижче сам */
 .filters{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
 .filters .search-wrap{margin-left:auto;flex:1 1 240px;max-width:400px}
+/* 16px за замовчуванням — не косметика: за меншого шрифту iOS зумить сторінку на
+   фокусі поля. Дрібніший шрифт лишаємо ЛИШЕ там, де впевнено є мишка: якщо
+   визначення не спрацює, отримаємо 16px і без зуму, а не навпаки (тач-екран, що
+   відповів pointer:fine — наприклад планшет із трекпадом — інакше зумив би). */
 .search{width:100%;height:var(--ctl-h);padding:0 14px;border-radius:10px;border:1px solid var(--border);
-  background:var(--panel);color:var(--text);font-family:var(--font);font-size:13px;outline:none;transition:.16s}
+  background:var(--panel);color:var(--text);font-family:var(--font);font-size:16px;outline:none;transition:.16s}
+@media (hover:hover) and (pointer:fine){.search{font-size:13px}}
 .search:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .search::placeholder{color:var(--mute)}
-/* 16px — не косметика: за меншого шрифту iOS зумить сторінку на фокусі поля,
-   і далі вся сторінка лишається збільшеною. Прив'язка до типу вказівника, а не
-   до ширини: телефон в альбомі й планшет ширші за будь-який «мобільний»
-   брейкпоінт, а зумить їх так само. */
-@media (pointer:coarse){.search{font-size:16px}}
 .dd-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .dot{width:9px;height:9px;border-radius:50%;flex:none}
 .dot.deep{background:var(--deep)} .dot.mid{background:var(--mid)} .dot.aware{background:var(--aware)}
@@ -1239,12 +1239,37 @@ let searchTimer = null;
 // чому набране одне-два не фільтрує нічого.
 const SEARCH_PH_WIDE = `Пошук по матеріалах рівня (від ${SEARCH_MIN} символів)…`;
 const SEARCH_PH_NARROW = `Пошук: від ${SEARCH_MIN} символів…`;
-// Короткий підпис потрібен у двох випадках: телефон (поле — рядок сітки) і будь-який
-// тач-екран (там шрифт поля 16px проти зуму, і довгий текст уже не влазить у 400px
-// поля навіть на планшеті). Тому умова — ширина АБО тип вказівника.
-const shortPhMQ = window.matchMedia('(max-width:560px), (pointer:coarse)');
+// Короткий підпис потрібен у двох випадках: телефон (поле — рядок сітки) і всюди,
+// де поле має 16-піксельний шрифт проти зуму, — з ним довгий текст не влазить у
+// 400px поля навіть на планшеті. Умови дзеркалять CSS: 13px лишається тільки під
+// мишкою, тож усе інше — короткий підпис.
+const narrowMQ = window.matchMedia('(max-width:560px)');
+const mouseMQ = window.matchMedia('(hover:hover) and (pointer:fine)');
 function syncSearchPlaceholder(){
-  $('#search').placeholder = shortPhMQ.matches ? SEARCH_PH_NARROW : SEARCH_PH_WIDE;
+  const short = narrowMQ.matches || !mouseMQ.matches;
+  $('#search').placeholder = short ? SEARCH_PH_NARROW : SEARCH_PH_WIDE;
+}
+
+// 16px шрифту поля мало не завжди: iOS міряє його проти власного «розбірливого»
+// розміру, а той росте разом із системним Розміром тексту — на такому телефоні
+// сторінка зумиться і з 16px, і назад сама не повертається. Тому на час фокусу
+// поля додаємо до viewport maximum-scale=1: він забороняє саме АВТОМАТИЧНИЙ зум.
+// Пінч-зум лишається — Safari з iOS 10 ігнорує maximum-scale для жестів людини,
+// а поза фокусом мета взагалі вихідна. Обмежено WebKit-ом на тачі: у Chrome для
+// Android автозуму немає, а maximum-scale там жести таки ріже.
+function armSearchZoomGuard(){
+  const meta = document.querySelector('meta[name=viewport]');
+  const webkitTouch = /^Apple/.test(navigator.vendor || '') && navigator.maxTouchPoints > 0;
+  if(!meta || !webkitTouch) return;
+  const base = meta.content;
+  const input = $('#search');
+  // touchstart, а не focus: до моменту фокуса Safari уже вирішив, чи зумити,
+  // тож мету треба підмінити ще на дотику. focus — для клавіатурного/іншого
+  // шляху до поля (наприклад із зовнішньої клавіатури на планшеті).
+  const lock = ()=>{ meta.content = base + ',maximum-scale=1'; };
+  input.addEventListener('touchstart', lock, {passive:true});
+  input.addEventListener('focus', lock);
+  input.addEventListener('blur', ()=>{ meta.content = base; });
 }
 
 function onSearchInput(raw){
@@ -1593,6 +1618,7 @@ function init(){
   });
 
   $('#search').oninput = e=>onSearchInput(e.target.value.trim());
+  armSearchZoomGuard();
   document.querySelectorAll('.tab').forEach(t=>t.onclick = ()=>switchTab(t.dataset.tab));
   $('#themeBtn').onclick = ()=>{ state.theme = state.theme==='dark'?'light':'dark'; applyTheme(); save(); };
   $('#logoutBtn').onclick = async ()=>{
