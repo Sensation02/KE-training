@@ -538,7 +538,7 @@ body.src-open{overflow:hidden}
       <div class="dd-row" id="filterRow"></div>
       <div class="search-wrap">
         <span class="search-ic" data-icon="search"></span>
-        <input class="search" id="search" type="search" autocomplete="off">
+        <input class="search" id="search" type="search" autocomplete="off" placeholder="Пошук…">
       </div>
     </div>
     <div id="readerList"></div>
@@ -1173,12 +1173,21 @@ function makeDropdown({options, nouns, set, onChange, cls}){
       b.setAttribute('aria-selected', set.has(b.dataset.v) ? 'true' : 'false'));
     const all = set.size === options.length;
     panel.querySelector('.dd-all').setAttribute('aria-selected', all ? 'true' : 'false');
-    // Підпис тригера: назва групи, коли вибрано все або нічого не звужено;
-    // сама опція, коли лишилась одна (найчастіший випадок — «дивлю лише це»);
-    // інакше — скільки саме вибрано, бо перелічити їх у кнопці нема місця.
-    root.querySelector('.dd-label').textContent = all ? nouns.all
-      : set.size === 1 ? options.find(o=>set.has(o.value)).label
-      : nouns.some + ': ' + set.size;
+    // Підпис тригера: назва групи, коли вибрано все; сама опція, коли лишилась
+    // одна (найчастіший випадок — «дивлю лише це»); інакше — перелік вибраних
+    // назв, якщо тригер його вміщає (заміряємо вже вставлений текст — це той
+    // самий спосіб, яким openDropdown вирішує, чи панель вилазить за екран).
+    // Не влазить — компактне «Категорії: 3»: обрізана на півслові назва гірша
+    // за число.
+    const label = root.querySelector('.dd-label');
+    if(all){
+      label.textContent = nouns.all;
+    }else if(set.size === 1){
+      label.textContent = options.find(o=>set.has(o.value)).label;
+    }else{
+      label.textContent = options.filter(o=>set.has(o.value)).map(o=>o.label).join(', ');
+      if(label.scrollWidth > label.clientWidth) label.textContent = nouns.some + ': ' + set.size;
+    }
   }
   sync();
 
@@ -1266,23 +1275,6 @@ function matchQ(cat, q){
 const SEARCH_MIN = 3;
 const SEARCH_DEBOUNCE_MS = 220;
 let searchTimer = null;
-
-// На телефоні поле займає рядок сітки фільтрів, а не всю ширину контенту —
-// довгий підпис там обрізається на півслові, тож він залежить від ширини, а не
-// від смаку. Умову «від 3 символів» несуть обидва варіанти: без неї незрозуміло,
-// чому набране одне-два не фільтрує нічого.
-const SEARCH_PH_WIDE = `Пошук по матеріалах рівня (від ${SEARCH_MIN} символів)…`;
-const SEARCH_PH_NARROW = `Пошук: від ${SEARCH_MIN} символів…`;
-// Короткий підпис потрібен у двох випадках: телефон (поле — рядок сітки) і всюди,
-// де поле має 16-піксельний шрифт проти зуму, — з ним довгий текст не влазить у
-// 400px поля навіть на планшеті. Умови дзеркалять CSS: 13px лишається тільки під
-// мишкою, тож усе інше — короткий підпис.
-const narrowMQ = window.matchMedia('(max-width:560px)');
-const mouseMQ = window.matchMedia('(hover:hover) and (pointer:fine)');
-function syncSearchPlaceholder(){
-  const short = narrowMQ.matches || !mouseMQ.matches;
-  $('#search').placeholder = short ? SEARCH_PH_NARROW : SEARCH_PH_WIDE;
-}
 
 // 16px шрифту поля мало не завжди: iOS міряє його проти власного «розбірливого»
 // розміру, а той росте разом із системним Розміром тексту — на такому телефоні
@@ -1380,8 +1372,14 @@ function renderReader(){
         e.stopPropagation();
         const ns = STATUS_CYCLE[qstatus(k)];
         setStatus(k, ns);
-        stBtn.className = 'status '+(ns!=='new'?ns:'');
-        stBtn.textContent = STATUS_TXT[ns];
+        if(filter.statuses.has(ns)){
+          stBtn.className = 'status '+(ns!=='new'?ns:'');
+          stBtn.textContent = STATUS_TXT[ns];
+        }else{
+          // новий статус випав з активного фільтра статусів — питання мусить
+          // зникнути одразу, а не чекати наступної дії, що перемалює список
+          renderReader();
+        }
       };
       items.appendChild(qEl);
     });
@@ -1630,13 +1628,17 @@ function init(){
   refreshProgress();
   applyTheme();
 
-  // висота липкого топбару → офсет для липких заголовків відкритих запитань
+  // висота липкого топбару → офсет для липких заголовків відкритих запитань.
+  // -2px: заголовок питання приліплюємо трохи ПІД межу топбару, а не рівно
+  // на неї — округлення дробової висоти топбара інакше лишає щілину в 1-2px,
+  // крізь яку на мить видно текст відповіді, що скролиться позаду. Топбар
+  // непрозорий і його z-index вищий, тож цей маленький заліз під нього не
+  // видно — він просто закриває шов.
   const syncStickTop = ()=>{
     const tb = document.querySelector('.topbar');
-    if(tb) document.documentElement.style.setProperty('--stick-top', tb.offsetHeight+'px');
+    if(tb) document.documentElement.style.setProperty('--stick-top', Math.max(0, tb.offsetHeight - 2)+'px');
   };
   syncStickTop();
-  syncSearchPlaceholder();
 
   // Кнопка «вгору» — лише коли гортати вгору справді далеко (понад екран із
   // чвертю). На коротких сторінках (порожня колода, вузька вибірка) не з'явиться.
@@ -1648,7 +1650,7 @@ function init(){
   // поворот екрана / зміна вікна робить замір вирівнювання панелі несправжнім —
   // простіше закрити її, ніж переміряти на льоту
   window.addEventListener('resize', ()=>{
-    syncStickTop(); syncSearchPlaceholder(); closeDropdown(); syncToTop();
+    syncStickTop(); closeDropdown(); syncToTop();
   });
 
   $('#search').oninput = e=>onSearchInput(e.target.value.trim());
