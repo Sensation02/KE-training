@@ -230,7 +230,12 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 .cat.closed .items{display:none}
 .items{border-top:1px solid var(--border-soft)}
 
-.q{border-top:1px solid var(--border-soft)}
+/* isolate: без цього z-index липкого q-head порівнюється з .answer лише
+   через "хто підняв стек першим", і в Safari/iOS трапляється, що довгий
+   .answer (там-таки .exam з рамкою) промальовується ПОВЕРХ приліпленого
+   заголовка, поки відповідь скролиться позаду нього. Власний стековий
+   контекст на .q робить порядок «заголовок завжди зверху» однозначним. */
+.q{border-top:1px solid var(--border-soft);isolation:isolate}
 .q:first-child{border-top:none}
 .q-head{display:flex;align-items:flex-start;gap:12px;padding:10px 17px;cursor:pointer}
 .q-head:hover{background:var(--card-hi)}
@@ -252,7 +257,10 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 .copy-btn.copied{opacity:1;color:var(--good);border-color:var(--good);background:var(--good-soft)}
 .answer{display:none;padding:2px 17px 16px 17px;font-size:14.5px}
 .q.open .answer{display:block;animation:fade .2s}
-.q.open .q-head{background:var(--card-hi);position:sticky;top:var(--stick-top,86px);z-index:5}
+/* translateZ(0): власний композитний шар — підстраховка від того самого
+   Safari-глюка з порядком промальовки липких елементів під час скролу. */
+.q.open .q-head{background:var(--card-hi);position:sticky;top:var(--stick-top,86px);z-index:5;
+  transform:translateZ(0)}
 
 .empty{text-align:center;padding:60px 20px;color:var(--mute)}
 .empty .big{font-size:34px;margin-bottom:10px}
