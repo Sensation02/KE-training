@@ -158,10 +158,16 @@ body.src-open .to-top,body.session-open .to-top{opacity:0;pointer-events:none}
 
 /* мультивибірний дропдаун (категорії / рівні / статус — і в читалці, і в колоді) */
 .dd{position:relative;min-width:0}
+/* max-width фіксований (не max-width:100% від батька): інакше тригер росте
+   під довгий перелік вибраних назв, розсуваючи сусідні контроли — а вбудований
+   у sync() перехід на компактне «Категорії: N» ніколи не спрацьовував, бо
+   scrollWidth ніколи не перевищував clientWidth, що ріс разом із контентом.
+   На великих екранах підпис влазить довший (216px), на вузьких — коротший. */
 .dd-trigger{display:inline-flex;align-items:center;gap:9px;height:var(--ctl-h);padding:0 12px;
-  min-width:0;max-width:100%;
+  min-width:0;max-width:168px;
   border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--text);
   cursor:pointer;font-family:var(--font);font-size:12.5px;font-weight:500;line-height:1;transition:.14s}
+@media (min-width:900px){ .dd-trigger{max-width:216px} }
 /* висота тригера фіксована (--ctl-h), тож переносити підпис нікуди — на вузькому
    екрані він обрізається трьома точками, а не розсуває контрол за межі екрана */
 .dd-label{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
@@ -259,7 +265,7 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 .copy-btn svg{display:block;width:15px;height:15px}
 .copy-btn:hover{opacity:1;background:var(--panel);border-color:var(--border)}
 .copy-btn.copied{opacity:1;color:var(--good);border-color:var(--good);background:var(--good-soft)}
-.answer{display:none;padding:2px 17px 16px 17px;font-size:14.5px}
+.answer{display:none;padding:12px 17px 16px 17px;font-size:14.5px}
 .q.open .answer{display:block;animation:fade .2s}
 /* translateZ(0): власний композитний шар — підстраховка від того самого
    Safari-глюка з порядком промальовки липких елементів під час скролу. */
@@ -348,7 +354,9 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 .chk-item.done .chk-box{background:var(--good);border-color:var(--good);color:#fff}
 .chk-item.done .chk-text{color:var(--mute);text-decoration:line-through}
 .chk-text{flex:1;font-size:14px}
-.chk-text .dbadge{display:inline-block;margin:0 8px 0 0;vertical-align:middle}
+/* vertical-align:middle центрує за x-height шрифту формально, але на око
+   крапка вигодить нижче першого рядка тексту — виміряно в браузері */
+.chk-text .dbadge{display:inline-block;margin:0 8px 0 0;vertical-align:middle;position:relative;top:-2px}
 .chk-refs{margin-top:7px;display:flex;gap:6px;flex-wrap:wrap}
 
 /* ============ Джерело: рядок входу + оверлей ============ */
@@ -376,7 +384,7 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
   background:none;color:var(--dim);font-size:16px;cursor:pointer;transition:.14s}
 .src-close:hover{color:var(--text);border-color:var(--accent)}
 .src-legend{display:flex;gap:14px;flex-wrap:wrap;padding:12px 19px;
-  border-bottom:1px solid var(--border-soft);font-size:11.5px;color:var(--mute)}
+  font-size:11.5px;color:var(--mute)}
 /* нагадування, що кольори — буквально заливка клітинок з .xlsx, лишаємо
    навіть після того, як пункти без заливки в перших 6 категоріях сховано
    (renderSource): інакше сенс кольорових міток біля решти пунктів губиться */
@@ -484,7 +492,10 @@ body.src-open{overflow:hidden}
      поруч зі «Усі статуси» і читається як ще один фільтр. */
   .deck-controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .deck-controls .dd-status{grid-column:span 2}
-  .dd,.dd-trigger,.deck-controls .mini-btn{width:100%}
+  /* max-width:none — інакше фіксована стеля з десктопного правила (нижче
+     ширини клітинки грида) переважає width:100% і звужує тригер сильніше,
+     ніж сусідній рядок пошуку */
+  .dd,.dd-trigger,.deck-controls .mini-btn{width:100%;max-width:none}
   .dd-trigger{padding:0 13px;font-size:13.5px;justify-content:space-between}
   .dd-opt{padding:11px 10px;font-size:14px}
   .topbar{padding:16px 0 14px;gap:10px}
@@ -503,7 +514,7 @@ body.src-open{overflow:hidden}
   .cat-head{padding:13px 12px}
   .cat-meta .mini{width:56px}
   .q-head{padding:12px 12px}
-  .answer{padding:2px 12px 18px 12px}
+  .answer{padding:12px 12px 18px 12px}
   .chk-item{padding:12px 12px}
   /* кнопка й так переноситься на власний рядок — хай займе його повністю,
      а не висить праворуч із пустотою (те саме рішення, що для пошуку) */
@@ -637,7 +648,7 @@ body.src-open{overflow:hidden}
       <span><span class="src-mark red"></span> рожева</span>
       <span><span class="src-mark plain"></span> без заливки</span>
     </div>
-    <div class="src-note">Заливка — це колір клітинки у вихідному .xlsx. У перших 6 категоріях пункти без заливки (⬜) приховано: вони не стали питаннями цього рівня.</div>
+    <div class="src-note">Заливка — це колір клітинки у вихідному .xlsx. У перших 6 категоріях пункти без заливки (⬜) здебільшого приховано: вони не стали питаннями цього рівня.</div>
     <div class="src-body" id="srcBody"></div>
   </div>
 </div>
@@ -1236,6 +1247,11 @@ function makeDropdown({options, nouns, set, onChange, cls}){
     }
   }
   sync();
+  // ширина тригера залежить від брейкпоінта (медіа-запити), а підпис — від
+  // set.size у момент вибору: змінили розмір вікна без нового кліку — підпис
+  // лишався б переліком і обрізався б CSS-еліпсисом посеред слова замість
+  // компактного «Категорії: N»
+  window.addEventListener('resize', sync);
 
   trigger.onclick = e=>{
     e.stopPropagation();
@@ -1255,6 +1271,12 @@ function makeDropdown({options, nouns, set, onChange, cls}){
       const all = set.size === options.length;
       set.clear();
       if(!all) options.forEach(o=>set.add(o.value));
+    }else if(set.size === options.length){
+      // Коли вибрано «усі», клік по конкретному пункту означає «лише це»,
+      // а не «зніми це з усіх» — інакше клікнутий пункт єдиний зникав, а
+      // виділеними лишались усі решта (протилежне до очікуваного).
+      set.clear();
+      set.add(b.dataset.v);
     }else{
       toggleSet(set, b.dataset.v);
     }
@@ -1580,6 +1602,19 @@ function renderCard(){
    ЧЕКЛИСТ
    ============================================================ */
 function chkKey(ci, ii){ return ci+':'+ii; }
+function chkItemByKey(k){
+  const [ci, ii] = k.split(':').map(Number);
+  return DATA.checklist[ci].items[ii];
+}
+// Показаний стан пункту чеклиста: ручна відмітка, якщо вона є (true/false —
+// в т.ч. явне зняття, що переважає авто-стан), інакше — авто: пункт покритий
+// хоча б одним питанням і ВСІ його питання вже «знаю» в читалці. Порожній
+// список refs ніколи не авто-перекреслюється — нічого звіряти.
+function chkIsOn(k, refs){
+  const manual = state.chk[k];
+  if(manual !== undefined) return manual;
+  return refs.length > 0 && refs.every(r=>qstatus(r)==='known');
+}
 /* ============ Джерело (вихідна матриця компетенцій) ============ */
 // Малюється один раз, при першому відкритті: 189 вузлів немає сенсу
 // будувати на старті, якщо оверлей можуть жодного разу не відкрити.
@@ -1596,18 +1631,19 @@ const SRC_TECH_SECTION_COUNT = 6;
 function renderSource(){
   if(srcRendered || !DATA.source) return;
   $('#srcBody').innerHTML = DATA.source.sections.map((sec, i)=>{
-    const items = i < SRC_TECH_SECTION_COUNT ? sec.items.filter(it=>it.mark!=='plain') : sec.items;
-    // категорія без жодного кольорового пункту (напр. «Загальні вимоги» —
-    // самі ⬜) інакше розгортається у порожнечу: пояснюємо, а не мовчимо
-    const body = items.length ? items.map(it=>
+    // якщо категорія складається СУЦІЛЬНО з пунктів без заливки (напр.
+    // «Загальні вимоги» — самі ⬜), фільтр лишив би її порожньою: тоді
+    // ховати нічого не ховаємо і показуємо пункти як є, а не заглушку
+    const filtered = i < SRC_TECH_SECTION_COUNT ? sec.items.filter(it=>it.mark!=='plain') : sec.items;
+    const items = filtered.length ? filtered : sec.items;
+    const body = items.map(it=>
         '<div class="src-item">'+
           // пробіли між span'ами навмисні: без них копіювання пункту
           // зі сторінки дає склеєне «B2Вміє…»
           '<span class="src-ref">'+esc(it.ref)+'</span> '+
           '<span class="src-mark '+esc(it.mark)+'"></span> '+
           '<span>'+esc(it.text)+'</span>'+
-        '</div>').join('')
-      : '<div class="src-item src-empty">Усі пункти цієї категорії — без заливки, приховано.</div>';
+        '</div>').join('');
     return '<details class="src-sec">'+
       '<summary><span class="src-col">'+esc(sec.col)+'</span>'+esc(sec.name)+
         '<span class="src-cnt">'+items.length+'</span></summary>'+
@@ -1648,10 +1684,10 @@ function renderCheck(){
     const rows = cat.items.map((it, ii)=>{
       total++;
       const k = chkKey(ci,ii);
-      const on = !!state.chk[k];
-      if(on){ done++; catDone++; }
       // чипи питань, що покривають пункт: колір = статус вивчення, клік = перехід у читалку
       const refs = (it.qs||[]).filter(r=>Q_BY_KEY[r]);
+      const on = chkIsOn(k, refs);
+      if(on){ done++; catDone++; }
       const refsHtml = refs.length
         ? '<span class="chk-refs">'+refs.map(r=>{
             const hit = Q_BY_KEY[r];
@@ -1679,7 +1715,12 @@ function renderCheck(){
   root.querySelectorAll('.chk-item').forEach(row=>{
     row.onclick = ()=>{
       const k = row.dataset.k;
-      if(state.chk[k]) delete state.chk[k]; else state.chk[k]=true;
+      const it = chkItemByKey(k);
+      const refs = (it.qs||[]).filter(r=>Q_BY_KEY[r]);
+      // клік завжди інвертує те, що зараз ПОКАЗАНО (а не лише ручний прапорець):
+      // якщо пункт зараз перекреслений автоматично (усі його питання «знаю»),
+      // клік явно знімає його, а не мовчки повторно ставить те саме true
+      state.chk[k] = !chkIsOn(k, refs);
       saveProgress(); renderCheck();
     };
   });
