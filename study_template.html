@@ -239,11 +239,15 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 .q:first-child{border-top:none}
 .q-head{display:flex;align-items:flex-start;gap:12px;padding:10px 17px;cursor:pointer}
 .q-head:hover{background:var(--card-hi)}
-.dbadge{flex:none;margin-top:3px;width:9px;height:9px;border-radius:50%}
+/* margin-top підібраний під фактичний оптичний центр гліфа першого рядка
+   .q-title (заміряно в браузері), а не під висоту line-box — вони не збігаються */
+.dbadge{flex:none;margin-top:8px;width:9px;height:9px;border-radius:50%}
 .dbadge.deep{background:var(--deep)} .dbadge.mid{background:var(--mid)} .dbadge.aware{background:var(--aware)}
 .q-title{flex:1;font-size:14.5px;min-width:0;font-weight:500}
 .q-title .id{font-family:var(--mono);font-size:11px;color:var(--mute);margin-right:7px}
-.status{flex:none;font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:8px;
+/* фіксована ширина під найдовший підпис («✓ знаю»), інакше «◐ вчу» вужчий за
+   «✓ знаю»/«○ нове» — і copy-btn ліворуч стрибає між рядками різних статусів */
+.status{flex:none;min-width:70px;text-align:center;font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:8px;
   border:1px solid var(--border);background:var(--panel);color:var(--mute);cursor:pointer;
   white-space:nowrap;transition:.14s}
 .status:hover{border-color:var(--accent)}
@@ -480,7 +484,7 @@ body.src-open{overflow:hidden}
   .tab .cnt{display:none}
   .card{padding:16px 13px;min-height:300px}
   .card-q{font-size:18px}
-  .status{padding:7px 11px;font-size:11.5px}
+  .status{padding:7px 11px;font-size:11.5px;min-width:76px}
   .cat-head{padding:13px 12px}
   .cat-meta .mini{width:56px}
   .q-head{padding:12px 12px}
@@ -512,6 +516,16 @@ body.src-open{overflow:hidden}
 @media (max-width:370px){
   .tab{font-size:13px;padding:13px 4px;gap:5px}
   .tab .tab-ic svg{width:15px;height:15px}
+}
+
+/* великі монітори: 1000px лишає майже весь екран порожнім по боках. Ширшу
+   колонку не тягнемо до кінця viewport — «answer»/markdown-текст втрачає
+   читабельність за дуже довгих рядків, тож зупиняємось на поміркованих кроках */
+@media (min-width:1300px){
+  .app{max-width:1160px}
+}
+@media (min-width:1700px){
+  .app{max-width:1320px}
 }
 </style>
 </head>
