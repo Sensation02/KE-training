@@ -1182,9 +1182,12 @@ function makeDropdown({options, nouns, set, onChange, cls}){
   const panel = root.querySelector('.dd-panel');
 
   function sync(){
-    panel.querySelectorAll('.dd-opt[data-v]').forEach(b=>
-      b.setAttribute('aria-selected', set.has(b.dataset.v) ? 'true' : 'false'));
     const all = set.size === options.length;
+    // «Усі» і конкретні пункти — взаємовиключні візуально: коли вибрано все,
+    // галочку показує лише «Усі», а не «Усі» + кожен пункт окремо; галочки на
+    // самих пунктах з'являються лише тоді, коли звужено до конкретного набору.
+    panel.querySelectorAll('.dd-opt[data-v]').forEach(b=>
+      b.setAttribute('aria-selected', (!all && set.has(b.dataset.v)) ? 'true' : 'false'));
     panel.querySelector('.dd-all').setAttribute('aria-selected', all ? 'true' : 'false');
     // Підпис тригера: назва групи, коли вибрано все; сама опція, коли лишилась
     // одна (найчастіший випадок — «дивлю лише це»); інакше — перелік вибраних
