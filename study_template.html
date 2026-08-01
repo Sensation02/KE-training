@@ -367,6 +367,9 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
   box-shadow:var(--shadow);overflow:hidden}
 .src-head{display:flex;align-items:flex-start;gap:14px;padding:17px 19px;
   border-bottom:1px solid var(--border)}
+/* без flex:1 тут заголовок стискається до вмісту, і ✕ опиняється одразу
+   праворуч від тексту замість дальнього кута панелі */
+.src-title-wrap{flex:1;min-width:0}
 .src-head h2{font-size:16px;font-weight:650;line-height:1.35}
 .src-head .src-sub{margin-top:4px;font-size:11.5px;color:var(--mute);font-family:var(--mono)}
 .src-close{flex:none;width:34px;height:34px;border-radius:9px;border:1px solid var(--border);
@@ -374,6 +377,11 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 .src-close:hover{color:var(--text);border-color:var(--accent)}
 .src-legend{display:flex;gap:14px;flex-wrap:wrap;padding:12px 19px;
   border-bottom:1px solid var(--border-soft);font-size:11.5px;color:var(--mute)}
+/* нагадування, що кольори — буквально заливка клітинок з .xlsx, лишаємо
+   навіть після того, як пункти без заливки в перших 6 категоріях сховано
+   (renderSource): інакше сенс кольорових міток біля решти пунктів губиться */
+.src-note{padding:0 19px 12px;font-size:11.5px;color:var(--mute);
+  border-bottom:1px solid var(--border-soft)}
 .src-body{overflow-y:auto;padding:15px 19px 22px;-webkit-overflow-scrolling:touch}
 .src-sec{margin-bottom:10px;border:1px solid var(--border);border-radius:12px;
   background:var(--card);overflow:hidden}
@@ -388,6 +396,7 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 .src-cnt{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--mute)}
 .src-item{display:flex;align-items:flex-start;gap:10px;padding:10px 15px;
   border-top:1px solid var(--border-soft);font-size:13.5px}
+.src-item.src-empty{color:var(--mute);font-style:italic}
 .src-ref{flex:none;font-family:var(--mono);font-size:10.5px;color:var(--mute);margin-top:2px;
   min-width:38px}
 /* Мітки повторюють пастель оригіналу, щоб звірка з .xlsx була очевидною.
@@ -509,7 +518,7 @@ body.src-open{overflow:hidden}
   .chk-legend{justify-content:space-between;gap:10px}
   .src-ov{padding:0}
   .src-panel{max-height:100vh;height:100%;border:none;border-radius:0}
-  .src-head,.src-legend,.src-body{padding-left:14px;padding-right:14px}
+  .src-head,.src-legend,.src-note,.src-body{padding-left:14px;padding-right:14px}
   .src-close{width:44px;height:44px}
   .src-sec>summary{padding:14px 12px}
   .src-item{padding:11px 12px}
@@ -616,7 +625,7 @@ body.src-open{overflow:hidden}
 <div class="src-ov" id="srcOverlay" role="dialog" aria-modal="true" aria-labelledby="srcTitle" hidden>
   <div class="src-panel">
     <div class="src-head">
-      <div>
+      <div class="src-title-wrap">
         <h2 id="srcTitle"></h2>
         <div class="src-sub">вихідний документ, з якого зроблено матеріали</div>
       </div>
@@ -628,6 +637,7 @@ body.src-open{overflow:hidden}
       <span><span class="src-mark red"></span> рожева</span>
       <span><span class="src-mark plain"></span> без заливки</span>
     </div>
+    <div class="src-note">Заливка — це колір клітинки у вихідному .xlsx. У перших 6 категоріях пункти без заливки (⬜) приховано: вони не стали питаннями цього рівня.</div>
     <div class="src-body" id="srcBody"></div>
   </div>
 </div>
@@ -1576,21 +1586,34 @@ function chkKey(ci, ii){ return ci+':'+ii; }
 let srcRendered = false;
 let srcReturnFocus = null;
 
+// перших 6 категорій (A · Загальні вимоги … F · Software development
+// methodology) лягли в основу навчальних матеріалів рівня — і саме з них
+// зроблено питання. Пункти без заливки (⬜) там — базові/нижчого рівня
+// вимоги, які в питання не перетворились, тож у «Джерелі» лише засмічують
+// список. У решті категорій (soft skills, у матеріали не входять) заливка
+// такого сенсу не несе — там пункти лишаємо всі.
+const SRC_TECH_SECTION_COUNT = 6;
 function renderSource(){
   if(srcRendered || !DATA.source) return;
-  $('#srcBody').innerHTML = DATA.source.sections.map(sec=>
-    '<details class="src-sec">'+
-      '<summary><span class="src-col">'+esc(sec.col)+'</span>'+esc(sec.name)+
-        '<span class="src-cnt">'+sec.items.length+'</span></summary>'+
-      sec.items.map(it=>
+  $('#srcBody').innerHTML = DATA.source.sections.map((sec, i)=>{
+    const items = i < SRC_TECH_SECTION_COUNT ? sec.items.filter(it=>it.mark!=='plain') : sec.items;
+    // категорія без жодного кольорового пункту (напр. «Загальні вимоги» —
+    // самі ⬜) інакше розгортається у порожнечу: пояснюємо, а не мовчимо
+    const body = items.length ? items.map(it=>
         '<div class="src-item">'+
           // пробіли між span'ами навмисні: без них копіювання пункту
           // зі сторінки дає склеєне «B2Вміє…»
           '<span class="src-ref">'+esc(it.ref)+'</span> '+
           '<span class="src-mark '+esc(it.mark)+'"></span> '+
           '<span>'+esc(it.text)+'</span>'+
-        '</div>').join('')+
-    '</details>').join('');
+        '</div>').join('')
+      : '<div class="src-item src-empty">Усі пункти цієї категорії — без заливки, приховано.</div>';
+    return '<details class="src-sec">'+
+      '<summary><span class="src-col">'+esc(sec.col)+'</span>'+esc(sec.name)+
+        '<span class="src-cnt">'+items.length+'</span></summary>'+
+      body+
+    '</details>';
+  }).join('');
   srcRendered = true;
 }
 
