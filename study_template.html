@@ -263,8 +263,14 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 .q.open .answer{display:block;animation:fade .2s}
 /* translateZ(0): власний композитний шар — підстраховка від того самого
    Safari-глюка з порядком промальовки липких елементів під час скролу. */
+/* box-shadow-кільце: --card-hi майже збігається з --bg у світлій темі, а тінь
+   .cat помітна лише біля її власних верху/низу картки. Поки рядок у потоці,
+   межу «дочитують» сусідні рядки картки; щойно він приліплюється сам-один під
+   час скролу — цих орієнтирів більше немає, і кнопки праворуч виглядають так,
+   ніби впритул до краю. Власне кільце дає рядку чіткий контур незалежно від
+   контрасту фону чи стану скролу. */
 .q.open .q-head{background:var(--card-hi);position:sticky;top:var(--stick-top,86px);z-index:5;
-  transform:translateZ(0)}
+  transform:translateZ(0);box-shadow:0 0 0 1px var(--border)}
 
 .empty{text-align:center;padding:60px 20px;color:var(--mute)}
 .empty .big{font-size:34px;margin-bottom:10px}
