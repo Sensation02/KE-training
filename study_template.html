@@ -230,7 +230,12 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 .cat.closed .items{display:none}
 .items{border-top:1px solid var(--border-soft)}
 
-.q{border-top:1px solid var(--border-soft)}
+/* isolate: без цього z-index липкого q-head порівнюється з .answer лише
+   через "хто підняв стек першим", і в Safari/iOS трапляється, що довгий
+   .answer (там-таки .exam з рамкою) промальовується ПОВЕРХ приліпленого
+   заголовка, поки відповідь скролиться позаду нього. Власний стековий
+   контекст на .q робить порядок «заголовок завжди зверху» однозначним. */
+.q{border-top:1px solid var(--border-soft);isolation:isolate}
 .q:first-child{border-top:none}
 .q-head{display:flex;align-items:flex-start;gap:12px;padding:10px 17px;cursor:pointer}
 .q-head:hover{background:var(--card-hi)}
@@ -252,7 +257,10 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 .copy-btn.copied{opacity:1;color:var(--good);border-color:var(--good);background:var(--good-soft)}
 .answer{display:none;padding:2px 17px 16px 17px;font-size:14.5px}
 .q.open .answer{display:block;animation:fade .2s}
-.q.open .q-head{background:var(--card-hi);position:sticky;top:var(--stick-top,86px);z-index:5}
+/* translateZ(0): власний композитний шар — підстраховка від того самого
+   Safari-глюка з порядком промальовки липких елементів під час скролу. */
+.q.open .q-head{background:var(--card-hi);position:sticky;top:var(--stick-top,86px);z-index:5;
+  transform:translateZ(0)}
 
 .empty{text-align:center;padding:60px 20px;color:var(--mute)}
 .empty .big{font-size:34px;margin-bottom:10px}
@@ -623,6 +631,10 @@ const OWNER_KEY = 'study_owner_v1';
 // Тема спільна для всіх сторінок origin (коренева + рівні). Навмисно НЕ
 // підпадає під clearLocalProgress: це косметика пристрою, а не прогрес.
 const THEME_KEY = 'study_theme_v1';
+// Обрані фільтри (категорії/рівні/статуси/пошук) — так само налаштування
+// пристрою, як тема: окремий ключ, НЕ синкається з сервером і НЕ чиститься
+// clearLocalProgress (суфікс не '_study_v1'), бо це не прогрес акаунта.
+const FILTERS_KEY = window.__LEVEL__ + '_study_filters_v1';
 // Прибирає прогрес УСІХ рівнів: localStorage спільний на origin, тож зміна
 // акаунта стосується l2/l3/... одразу, а не лише відкритого рівня.
 function clearLocalProgress(){
@@ -836,6 +848,7 @@ function openQuestion(key){
   if(!hit) return;
   filter = {cats:new Set(DATA.categories.map(c=>c.key)), depths:new Set(DEPTH_ORDER),
     statuses:new Set(STATUS_ORDER), search:''};
+  saveFilters();
   $('#search').value = '';
   clearTimeout(searchTimer); // інакше недобіглий дебаунс поверне старий запит уже після скидання
   closeDropdown();
@@ -1169,9 +1182,12 @@ function makeDropdown({options, nouns, set, onChange, cls}){
   const panel = root.querySelector('.dd-panel');
 
   function sync(){
-    panel.querySelectorAll('.dd-opt[data-v]').forEach(b=>
-      b.setAttribute('aria-selected', set.has(b.dataset.v) ? 'true' : 'false'));
     const all = set.size === options.length;
+    // «Усі» і конкретні пункти — взаємовиключні візуально: коли вибрано все,
+    // галочку показує лише «Усі», а не «Усі» + кожен пункт окремо; галочки на
+    // самих пунктах з'являються лише тоді, коли звужено до конкретного набору.
+    panel.querySelectorAll('.dd-opt[data-v]').forEach(b=>
+      b.setAttribute('aria-selected', (!all && set.has(b.dataset.v)) ? 'true' : 'false'));
     panel.querySelector('.dd-all').setAttribute('aria-selected', all ? 'true' : 'false');
     // Підпис тригера: назва групи, коли вибрано все; сама опція, коли лишилась
     // одна (найчастіший випадок — «дивлю лише це»); інакше — перелік вибраних
@@ -1232,13 +1248,14 @@ const statusOptions = ()=>{
 
 // Три дропдауни одного фільтра (filter або deckFilter) в один контейнер.
 function buildFilterDropdowns(host, f, onChange){
+  const persist = ()=>{ saveFilters(); onChange(); };
   host.append(
     makeDropdown({options:catOptions(), nouns:{all:'Усі категорії', some:'Категорії'},
-      set:f.cats, onChange}),
+      set:f.cats, onChange:persist}),
     makeDropdown({options:depthOptions(), nouns:{all:'Усі рівні', some:'Рівні'},
-      set:f.depths, onChange}),
+      set:f.depths, onChange:persist}),
     makeDropdown({options:statusOptions(), nouns:{all:'Усі статуси', some:'Статуси'},
-      set:f.statuses, onChange, cls:'dd-status'}));
+      set:f.statuses, onChange:persist, cls:'dd-status'}));
 }
 
 function buildReaderFilters(){
@@ -1304,6 +1321,7 @@ function onSearchInput(raw){
     const q = raw.length >= SEARCH_MIN ? raw : '';
     if(q === filter.search) return; // ще нема 3 символів або текст той самий
     filter.search = q;
+    saveFilters();
     renderReader();
   }, SEARCH_DEBOUNCE_MS);
 }
@@ -1406,6 +1424,37 @@ let deckFilter = {cats:new Set(DATA.categories.map(c=>c.key)), depths:new Set(DE
 // revealed — показано еталон «🎯 Відповідь на іспиті» (мішень самоперевірки);
 // fullShown — додатково розгорнуто повний міні-урок (за кнопкою)
 let deck = [], deckIdx = 0, revealed = false, fullShown = false;
+
+/* ---------- Фільтри: збереження вибору в localStorage ---------- */
+function saveFilters(){
+  localStorage.setItem(FILTERS_KEY, JSON.stringify({
+    reader: {cats:[...filter.cats], depths:[...filter.depths], statuses:[...filter.statuses], search:filter.search},
+    deck: {cats:[...deckFilter.cats], depths:[...deckFilter.depths], statuses:[...deckFilter.statuses]}
+  }));
+}
+// saved — масив значень із localStorage, valid — актуальний список опцій
+// (категорії могли змінитись між збіркою рівня і збереженим фільтром).
+// Порожній перетин ігнорується — «нічого не показувати» гірше, ніж «усі».
+function restoreSet(saved, valid){
+  if(!Array.isArray(saved)) return null;
+  const s = new Set(saved.filter(v=>valid.includes(v)));
+  return s.size ? s : null;
+}
+function loadFilters(){
+  let raw;
+  try{ raw = JSON.parse(localStorage.getItem(FILTERS_KEY) || '{}'); }
+  catch(e){ raw = {}; }
+  const allCats = DATA.categories.map(c=>c.key);
+  const apply = (f, saved)=>{
+    if(!saved) return;
+    f.cats = restoreSet(saved.cats, allCats) || f.cats;
+    f.depths = restoreSet(saved.depths, DEPTH_ORDER) || f.depths;
+    f.statuses = restoreSet(saved.statuses, STATUS_ORDER) || f.statuses;
+  };
+  apply(filter, raw.reader);
+  apply(deckFilter, raw.deck);
+  if(raw.reader && typeof raw.reader.search === 'string') filter.search = raw.reader.search;
+}
 
 function buildDeckControls(){
   const c = $('#deckControls');
@@ -1621,6 +1670,8 @@ function init(){
   $('#cntCards').textContent = total;
   $('#cntCheck').textContent = DATA.checklist.reduce((a,c)=>a+c.items.length,0);
 
+  loadFilters(); // раніше збережений вибір фільтрів читалки/колоди для цього рівня
+  $('#search').value = filter.search;
   buildReaderFilters();
   buildDeckControls();
   renderReader();
