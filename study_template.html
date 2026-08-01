@@ -16,6 +16,8 @@ PWA_HEAD_PLACEHOLDER
   --warn:#fbbf24; --warn-soft:rgba(251,191,36,.15);
   --deep:#c084fc; --mid:#60a5fa; --aware:#34d399;
   --code-bg:#0e1017; --code-line:#20242f;
+  --code-text:#c9d1e3; --code-inline:#e6b3ff;
+  --code-comment:#5f6b7d; --code-string:#7ee787; --code-keyword:#6fb3ff;
   --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 30px rgba(0,0,0,.28);
   --radius:16px;
   /* спільна висота контролів фільтрів (дропдаун, пошук, кнопки колоди):
@@ -32,8 +34,17 @@ PWA_HEAD_PLACEHOLDER
   --good:#0f9d58; --warn:#c07c00;
   --deep:#8b5cf6; --mid:#2563eb; --aware:#0f9d58;
   --shadow:0 1px 2px rgba(20,30,50,.05),0 8px 24px rgba(20,30,50,.07);
+  /* код лишається редакторського вигляду (не біла картка), але у світлих
+     тонах — не той самий майже-чорний блок, що й у темній темі */
+  --code-bg:#f5f3fb; --code-line:#e3dbf7;
+  --code-text:#31364a; --code-inline:#7c3aed;
+  --code-comment:#8890a0; --code-string:#0f7a3d; --code-keyword:#1a56db;
 }
 *{box-sizing:border-box;margin:0;padding:0}
+/* без appearance:none нативний рушій браузера домальовує власний бевел/тінь
+   під фон і бордер кнопки, що ми задаємо самі — особливо помітно на дрібних
+   .mini-btn (напр. «Повний розбір») як незрозуміла тінь під контролом */
+button{font:inherit;color:inherit;appearance:none;-webkit-appearance:none;cursor:pointer}
 html{scroll-behavior:smooth}
 /* overflow-x:clip — остання лінія оборони від «зуму» на iOS. Якщо якийсь елемент
    усе ж виявиться ширшим за екран, Safari розтягує layout viewport до нього й
@@ -126,9 +137,6 @@ body.src-open .to-top,body.session-open .to-top{opacity:0;pointer-events:none}
 .tab-txt{min-width:0;overflow-wrap:anywhere}
 .tab:hover{color:var(--text)}
 .tab.active{background:var(--accent);color:#fff;box-shadow:0 4px 14px var(--accent-soft)}
-.tab .cnt{font-family:var(--mono);font-size:11px;opacity:.85;
-  background:rgba(255,255,255,.16);padding:1px 6px;border-radius:20px}
-.tab:not(.active) .cnt{background:var(--card-hi);color:var(--mute)}
 
 .view{display:none} .view.active{display:block;animation:fade .25s ease}
 @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
@@ -158,16 +166,20 @@ body.src-open .to-top,body.session-open .to-top{opacity:0;pointer-events:none}
 
 /* мультивибірний дропдаун (категорії / рівні / статус — і в читалці, і в колоді) */
 .dd{position:relative;min-width:0}
-/* max-width фіксований (не max-width:100% від батька): інакше тригер росте
-   під довгий перелік вибраних назв, розсуваючи сусідні контроли — а вбудований
-   у sync() перехід на компактне «Категорії: N» ніколи не спрацьовував, бо
-   scrollWidth ніколи не перевищував clientWidth, що ріс разом із контентом.
-   На великих екранах підпис влазить довший (216px), на вузьких — коротший. */
-.dd-trigger{display:inline-flex;align-items:center;gap:9px;height:var(--ctl-h);padding:0 12px;
-  min-width:0;max-width:168px;
+/* ширина ФІКСОВАНА (не max-width) — інакше тригер сам стискається/росте
+   разом із довжиною підпису (одна категорія «Back-end» ↔ перелік «Front-End,
+   Back-end»), і сусідні контроли в рядку смикаються при кожному виборі.
+   Категоріям підпис довший (назви + компактне «Категорії: N»), рівням/статусу
+   вистачає вужчого. На великих екранах — трохи ширше. */
+.dd-trigger{display:inline-flex;align-items:center;justify-content:space-between;gap:9px;height:var(--ctl-h);padding:0 12px;
+  min-width:0;width:132px;
   border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--text);
   cursor:pointer;font-family:var(--font);font-size:12.5px;font-weight:500;line-height:1;transition:.14s}
-@media (min-width:900px){ .dd-trigger{max-width:216px} }
+.dd-cats .dd-trigger{width:172px}
+@media (min-width:900px){
+  .dd-trigger{width:150px}
+  .dd-cats .dd-trigger{width:220px}
+}
 /* висота тригера фіксована (--ctl-h), тож переносити підпис нікуди — на вузькому
    екрані він обрізається трьома точками, а не розсуває контрол за межі екрана */
 .dd-label{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
@@ -309,10 +321,15 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 .card-a{margin-top:18px;padding-top:18px;border-top:1px dashed var(--border);font-size:14.5px}
 .reveal-hint{margin-top:auto;padding-top:22px;text-align:center;color:var(--mute);font-size:13px}
 /* єдиний скрол — сторінки; кнопки Знаю/Повторити липнуть до низу екрана,
-   поки картка не доскролена, тож не губляться на довгому «Повному розборі» */
+   поки картка не доскролена, тож не губляться на довгому «Повному розборі».
+   Тінь-«затемнення» контенту над рядком — лише поки він реально приліплений
+   (.stuck, за IntersectionObserver на сторожі вище): для короткої картки, що
+   й так уміщається в екран, action-рядок ніколи не «прилипає» окремо від
+   звичайного потоку, і безумовна тінь лише зайво затемнювала б кнопку
+   «Повний розбір» над ним, нічого насправді не ховаючи. */
 .deck-actions{display:flex;gap:12px;width:100%;margin-top:auto;
-  position:sticky;bottom:0;background:var(--card);padding:16px 0 14px;
-  box-shadow:0 -14px 18px -6px var(--card)}
+  position:sticky;bottom:0;background:var(--card);padding:16px 0 14px}
+.deck-actions.stuck{box-shadow:0 -14px 18px -6px var(--card)}
 .btn{flex:1;min-width:0;padding:14px;border-radius:13px;border:1px solid var(--border);background:var(--panel);
   color:var(--text);font-family:var(--font);font-size:14.5px;font-weight:600;cursor:pointer;transition:.14s;
   display:flex;align-items:center;justify-content:center;gap:9px}
@@ -322,6 +339,9 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 .btn.know{color:var(--good);border-color:var(--good)}
 .btn kbd{font-family:var(--mono);font-size:10px;opacity:.7;border:1px solid currentColor;
   border-radius:5px;padding:1px 5px;line-height:1}
+/* підказка клавіші — для фізичної клавіатури; на тач-пристрої (телефон/
+   планшет) немає ні Space, ні цифр 1/2 як клавіш, тож підказка лише плутає */
+@media (hover:none), (pointer:coarse){.btn kbd{display:none}}
 .deck-controls{width:100%;display:flex;gap:8px;flex-wrap:wrap;align-items:center;
   justify-content:center;font-size:12.5px}
 /* спільна висота з дропдаунами і пошуком: кнопки або стоять із ними в одному
@@ -337,6 +357,9 @@ button.mini-btn,.btn{display:inline-flex;align-items:center;justify-content:cent
 .chk-head{display:flex;align-items:center;gap:12px 18px;flex-wrap:wrap;margin-bottom:18px}
 .chk-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--dim)}
 .chk-legend span{display:inline-flex;align-items:center;gap:7px}
+/* скидаємо зсув .dbadge, потрібний лише в .q-head (align-items:flex-start) —
+   тут рядок center-вирівняний, і той самий margin-top зсуває крапку вниз */
+.chk-legend .dbadge{margin-top:0}
 /* лічильник виконаного — не рядок тексту, а такий самий контроль прогресу, як
    у заголовках категорій: число + мінісмужка */
 .chk-progress{display:flex;align-items:center;gap:10px;margin-left:auto;
@@ -431,7 +454,7 @@ body.src-open{overflow:hidden}
 .md strong{font-weight:700} .md em{font-style:italic}
 .md a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-soft)}
 .md a:hover{border-bottom-color:var(--accent)}
-.md code{font-family:var(--mono);font-size:.86em;background:var(--code-bg);color:#e6b3ff;
+.md code{font-family:var(--mono);font-size:.86em;background:var(--code-bg);color:var(--code-inline);
   padding:2px 6px;border-radius:6px;border:1px solid var(--code-line);overflow-wrap:anywhere}
 /* у блоці — лишається скрол (.md pre{overflow-x:auto}), рядки коду не рвемо */
 .md pre code{overflow-wrap:normal}
@@ -446,20 +469,27 @@ body.src-open{overflow:hidden}
   letter-spacing:.08em;text-transform:uppercase;color:var(--mute);background:var(--code-line);
   padding:3px 9px;border-radius:0 0 0 8px}
 .md pre{margin:0;padding:14px 16px;overflow-x:auto}
-.md pre code{background:none;border:none;padding:0;color:#c9d1e3;font-size:12.6px;line-height:1.65}
+.md pre code{background:none;border:none;padding:0;color:var(--code-text);font-size:12.6px;line-height:1.65}
 .md table{width:100%;border-collapse:collapse;font-size:13px;display:block;overflow-x:auto}
 .md th,.md td{border:1px solid var(--border);padding:8px 11px;text-align:left;vertical-align:top}
 .md th{background:var(--card-hi);font-weight:600}
 /* підсвітка синтаксису */
-.t-c{color:#5f6b7d;font-style:italic} .t-s{color:#7ee787} .t-k{color:#ff9ecb}
+.t-c{color:var(--code-comment);font-style:italic} .t-s{color:var(--code-string)} .t-k{color:var(--code-keyword)}
 
 .footer{text-align:center;margin-top:22px;font-size:11.5px;color:var(--mute);font-family:var(--mono)}
 
 /* планшет і вужче — більші контроли Флеш-карток (зручніший тап) */
-/* планшет і вужче — більші тап-цілі в усіх контролах фільтрів одразу */
 @media (max-width:900px){
   :root{--ctl-h:42px}
-  .deck-controls{gap:10px}
+  /* Флеш-картки: п'ять контролів розтягуються рівномірно й лишаються в один
+     рядок, поки влазять (flex, не жорстка сітка) — на планшеті це майже
+     завжди так, і рядок на всю ширину виглядає краще за примусові 2 колонки.
+     Перенесення на другий рядок — лише коли реально затісно (вузький
+     планшет/телефон); тоді те, що не влізло, само розтягується по своєму
+     рядку. */
+  .deck-controls .dd{flex:1 1 150px}
+  .deck-controls .dd-trigger{width:100%}
+  .deck-controls .mini-btn{flex:1 1 150px}
   .deck-controls .mini-btn,.deck-controls .dd-trigger{font-size:13.5px;padding:0 14px;border-radius:11px}
   /* моно-11px у 42-піксельній кнопці губиться; на планшеті теж */
   .src-bar .mini-btn{font-size:12.5px}
@@ -477,26 +507,19 @@ body.src-open{overflow:hidden}
      вміщалась, лишалися 9px порожнього скролу «ні для чого» */
   .app{padding:0 7px calc(56px + env(safe-area-inset-bottom))}
   .to-top{bottom:calc(12px + env(safe-area-inset-bottom));right:12px}
-  /* Телефон: контроли фільтрів стають рівною сіткою 2×N замість «як вийшло».
-     display:contents на #filterRow піднімає самі .dd у клітинки сітки, тому
-     дропдауни і пошук вирівняні по одних і тих самих колонках. */
+  /* Телефон: контроли фільтрів читалки стають рівною сіткою 2×N замість «як
+     вийшло». display:contents на #filterRow піднімає самі .dd у клітинки
+     сітки, тому дропдауни і пошук вирівняні по одних і тих самих колонках.
+     (Флеш-картки на планшеті й вужче мають свою версію в @media 900px вище.) */
   .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
   #filterRow{display:contents}
-  /* Статус і пошук — на всю ширину рядка (те саме рішення, що для .dd-status у
-     колоді). У півклітинці в поле пошуку вміщався тільки скорочений підпис —
-     звідси й було незрозуміле «3+»; на цілий рядок влазить нормальний. */
+  /* Статус і пошук — на всю ширину рядка. У півклітинці в поле пошуку
+     вміщався тільки скорочений підпис — звідси й було незрозуміле «3+»;
+     на цілий рядок влазить нормальний. */
   .filters .dd-status,.filters .search-wrap{grid-column:span 2}
   .filters .search-wrap{margin-left:0;max-width:none}
-  /* колода: три фільтри займають два перші рядки (третій — на всю ширину),
-     дві дії лишаються разом в останньому. Інакше «перемішати» стоїть у колонці
-     поруч зі «Усі статуси» і читається як ще один фільтр. */
-  .deck-controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .deck-controls .dd-status{grid-column:span 2}
-  /* max-width:none — інакше фіксована стеля з десктопного правила (нижче
-     ширини клітинки грида) переважає width:100% і звужує тригер сильніше,
-     ніж сусідній рядок пошуку */
-  .dd,.dd-trigger,.deck-controls .mini-btn{width:100%;max-width:none}
-  .dd-trigger{padding:0 13px;font-size:13.5px;justify-content:space-between}
+  .dd,.dd-trigger{width:100%}
+  .dd-trigger{padding:0 13px;font-size:13.5px}
   .dd-opt{padding:11px 10px;font-size:14px}
   .topbar{padding:16px 0 14px;gap:10px}
   .brand{flex:1 1 100%;order:1}
@@ -507,7 +530,6 @@ body.src-open{overflow:hidden}
   .icon-btn,.nav-back{width:44px;height:44px;font-size:19px}
   .tabs{gap:5px;padding:5px}
   .tab{font-size:14.5px;padding:14px 6px;gap:6px}
-  .tab .cnt{display:none}
   .card{padding:16px 13px;min-height:300px}
   .card-q{font-size:18px}
   .status{padding:7px 11px;font-size:11.5px;min-width:76px}
@@ -574,9 +596,9 @@ body.src-open{overflow:hidden}
   </div>
 
   <div class="tabs">
-    <button class="tab active" data-tab="reader"><span class="tab-ic" data-icon="book-open"></span><span class="tab-txt">Читалка</span> <span class="cnt" id="cntReader">0</span></button>
-    <button class="tab" data-tab="cards"><span class="tab-ic" data-icon="layers"></span><span class="tab-txt">Флеш-картки</span> <span class="cnt" id="cntCards">0</span></button>
-    <button class="tab" data-tab="check"><span class="tab-ic" data-icon="check-square"></span><span class="tab-txt">Чеклист</span> <span class="cnt" id="cntCheck">0</span></button>
+    <button class="tab active" data-tab="reader"><span class="tab-ic" data-icon="book-open"></span><span class="tab-txt">Читалка</span></button>
+    <button class="tab" data-tab="cards"><span class="tab-ic" data-icon="layers"></span><span class="tab-txt">Флеш-картки</span></button>
+    <button class="tab" data-tab="check"><span class="tab-ic" data-icon="check-square"></span><span class="tab-txt">Чеклист</span></button>
   </div>
 
   <!-- ЧИТАЛКА -->
@@ -1279,6 +1301,9 @@ function makeDropdown({options, nouns, set, onChange, cls}){
       set.add(b.dataset.v);
     }else{
       toggleSet(set, b.dataset.v);
+      // зняли останній обраний пункт — «нічого не показувати» гірше й
+      // непередбачуваніше за «усі», тож порожній вибір відкочуємо назад
+      if(!set.size) options.forEach(o=>set.add(o.value));
     }
     sync();
     onChange();
@@ -1303,9 +1328,9 @@ function buildFilterDropdowns(host, f, onChange){
   const persist = ()=>{ saveFilters(); onChange(); };
   host.append(
     makeDropdown({options:catOptions(), nouns:{all:'Усі категорії', some:'Категорії'},
-      set:f.cats, onChange:persist}),
+      set:f.cats, onChange:persist, cls:'dd-cats'}),
     makeDropdown({options:depthOptions(), nouns:{all:'Усі рівні', some:'Рівні'},
-      set:f.depths, onChange:persist}),
+      set:f.depths, onChange:persist, cls:'dd-depths'}),
     makeDropdown({options:statusOptions(), nouns:{all:'Усі статуси', some:'Статуси'},
       set:f.statuses, onChange:persist, cls:'dd-status'}));
 }
@@ -1575,8 +1600,9 @@ function renderCard(){
       '</div>'+
       '<div class="card-q"><span style="font-family:var(--mono);font-size:.7em;color:var(--mute)">'+q.id+'&nbsp;&nbsp;</span>'+esc(q.title)+'</div>'+
       (revealed
-        // текст відповіді скролиться в межах .card-a; кнопку «Повний розбір»
-        // виносимо ПОЗА скрол-зону, щоб вона не ховалась під нижнім краєм
+        // скрол тут спільний зі сторінкою (не власний оверфлоу .card-a);
+        // кнопку «Повний розбір» лишаємо у звичайному потоці над action-рядком,
+        // а не приліплюємо — інакше довгий розбір ховав би її під собою
         ? '<div class="card-a md">'+examHtml(key,q)+(fullShown?md(key,q.md):'')+'</div>'+
           (fullShown?'':'<div class="full-toggle"><button class="mini-btn" id="fullBtn">'+ICONS['book-open']+' Повний розбір</button></div>')
         : '<div class="reveal-hint">Спробуй відповісти вголос, тоді звір з еталоном ↓</div>')+
@@ -1586,6 +1612,10 @@ function renderCard(){
             '<button class="btn know" id="knowBtn">'+ICONS.check+' Знаю <kbd>2</kbd></button>'+
           '</div>'
         : '<div class="deck-actions"><button class="btn primary" id="revealBtn">Показати відповідь <kbd>Space</kbd></button></div>')+
+      // сторож у самому кінці .card: поки він ще не проскролений у в'юпорт,
+      // під приліпленим action-рядком ще є неявлений контент картки — саме
+      // тоді тінь над рядком має сенс (див. stickObserver нижче)
+      '<div class="stick-sentinel"></div>'+
     '</div>';
 
   if(revealed){
@@ -1596,7 +1626,17 @@ function renderCard(){
   }else{
     $('#revealBtn').onclick = ()=>{ revealed=true; fullShown=false; renderCard(); };
   }
+  // тінь над липким action-рядком має сенс лише поки він РЕАЛЬНО приліплений,
+  // тобто картку ще не доскролено до кінця — див. stickObserver нижче
+  stickObserver.disconnect();
+  stickObserver.observe($('.stick-sentinel'));
 }
+const stickObserver = new IntersectionObserver(([entry])=>{
+  // сторож — останній елемент .card: поки він ще НЕ в'їхав у в'юпорт (лишається
+  // нижче за екран), під приліпленим action-рядком ще є неявлена частина
+  // картки — саме тоді тінь над рядком показує, що там ще щось є
+  $('.deck-actions')?.classList.toggle('stuck', !entry.isIntersecting && entry.boundingClientRect.top > 0);
+});
 
 /* ============================================================
    ЧЕКЛИСТ
@@ -1749,10 +1789,6 @@ function applyTheme(){
 
 function init(){
   paintIcons(); // заповнити всі статичні [data-icon] векторними SVG
-  const total = DATA.totals.questions;
-  $('#cntReader').textContent = total;
-  $('#cntCards').textContent = total;
-  $('#cntCheck').textContent = DATA.checklist.reduce((a,c)=>a+c.items.length,0);
 
   loadFilters(); // раніше збережений вибір фільтрів читалки/колоди для цього рівня
   $('#search').value = filter.search;
